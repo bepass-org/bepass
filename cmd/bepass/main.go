@@ -1,24 +1,25 @@
 package main
 
 import (
+	"bepass/doh"
+	"bepass/socks5"
+	"bepass/socks5/statute"
 	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/ameshkov/dnscrypt/v2"
-	"github.com/jellydator/ttlcache/v3"
-	"github.com/miekg/dns"
 	"io"
 	"math/rand"
 	"net"
 	"os"
-	"bepass/doh"
-	"bepass/socks5"
-	"bepass/socks5/statute"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ameshkov/dnscrypt/v2"
+	"github.com/jellydator/ttlcache/v3"
+	"github.com/miekg/dns"
 )
 
 // configs
