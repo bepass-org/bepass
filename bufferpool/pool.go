@@ -1,8 +1,6 @@
 package bufferpool
 
-import (
-	"sync"
-)
+import "sync"
 
 // BufPool is an interface for getting and returning temporary
 // byte slices for use by io.CopyBuffer.
@@ -12,29 +10,29 @@ type BufPool interface {
 }
 
 type pool struct {
-	size int
 	pool *sync.Pool
 }
 
-// NewPool new buffer pool for getting and returning temporary
+// NewPool creates a new buffer pool for getting and returning temporary
 // byte slices for use by io.CopyBuffer.
 func NewPool(size int) BufPool {
 	return &pool{
-		size,
 		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0, size) }},
+			New: func() interface{} { return make([]byte, size) },
+		},
 	}
 }
 
-// Get implement interface BufPool
-func (sf *pool) Get() []byte {
-	return sf.pool.Get().([]byte)
+// Get implements the BufPool interface.
+func (p *pool) Get() []byte {
+	return p.pool.Get().([]byte)
 }
 
-// Put implement interface BufPool
-func (sf *pool) Put(b []byte) {
-	if cap(b) != sf.size {
-		panic("invalid buffer size that's put into leaky buffer")
+// Put implements the BufPool interface.
+func (p *pool) Put(b []byte) {
+	if cap(b) == 0 || len(b) != cap(b) {
+		// Invalid buffer size, discard the buffer
+		return
 	}
-	sf.pool.Put(b[:0]) //nolint: staticcheck
+	p.pool.Put(b)
 }
