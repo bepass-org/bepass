@@ -1,6 +1,7 @@
 package socks5
 
 import (
+	"bepass/bufferpool"
 	"bufio"
 	"context"
 	"errors"
@@ -8,9 +9,11 @@ import (
 	"io"
 	"log"
 	"net"
-	"bepass/bufferpool"
+	"os"
 
 	"bepass/socks5/statute"
+
+	"bepass/logger"
 )
 
 // GPool is used to implement custom goroutine pool default use goroutine
@@ -43,7 +46,7 @@ type Server struct {
 	bindIP net.IP
 	// logger can be used to provide a custom log target.
 	// Defaults to io.Discard.
-	logger Logger
+	logger logger.Logger
 	// Optional function for dialing out
 	dial func(ctx context.Context, network, addr string) (net.Conn, error)
 	// buffer pool
@@ -58,12 +61,14 @@ type Server struct {
 
 // NewServer creates a new Server
 func NewServer(opts ...Option) *Server {
+	stdLogger := log.New(os.Stderr, "socksLogger", log.Ldate|log.Ltime)
+	socksLogger := logger.NewLogger(stdLogger)
 	srv := &Server{
 		authMethods: []Authenticator{},
 		bufferPool:  bufferpool.NewPool(32 * 1024),
 		resolver:    DNSResolver{},
 		rules:       NewPermitAll(),
-		logger:      NewLogger(log.New(io.Discard, "socks5: ", log.LstdFlags)),
+		logger:      socksLogger,
 		dial: func(ctx context.Context, net_, addr string) (net.Conn, error) {
 			return net.Dial(net_, addr)
 		},

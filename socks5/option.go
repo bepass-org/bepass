@@ -1,10 +1,11 @@
 package socks5
 
 import (
+	"bepass/bufferpool"
+	"bepass/logger"
 	"context"
 	"io"
 	"net"
-	"bepass/bufferpool"
 )
 
 // Option user's option
@@ -73,7 +74,7 @@ func WithBindIP(ip net.IP) Option {
 
 // WithLogger can be used to provide a custom log target.
 // Defaults to io.Discard.
-func WithLogger(l Logger) Option {
+func WithLogger(l logger.Logger) Option {
 	return func(s *Server) {
 		s.logger = l
 	}
