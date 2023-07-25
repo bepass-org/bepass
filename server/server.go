@@ -35,28 +35,6 @@ type Server struct {
 	Logger                *logger.Std
 }
 
-func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
-	chunks := make(map[int][]byte)
-	hostname, err := s.getHostname(data)
-	if err != nil {
-		s.Logger.Errorf("get hostname error, %v", err)
-		chunks[0] = data
-		return chunks
-	}
-	s.Logger.Printf("Hostname %s", string(hostname))
-	index := bytes.Index(data, hostname)
-	if index == -1 {
-		return nil
-	}
-	// before sni
-	chunks[0] = data[0:index]
-	// sni
-	chunks[1] = data[index : index+len(hostname)]
-	// after sni
-	chunks[2] = data[index+len(hostname):]
-	return chunks
-}
-
 // getHostname /* This function is basically all most folks want to invoke out of this
 func (s *Server) getHostname(data []byte) ([]byte, error) {
 	extensions, err := s.getExtensionBlock(data)
@@ -220,66 +198,86 @@ func (s *Server) getCompressionLength(data []byte, index int) (int, int, error) 
 
 	return compressionLength, newIndex, nil
 }
-func (s *Server) c(dst io.Writer, src io.Reader, split bool) {
-	buf := make([]byte, 32*1024)
+
+func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
+	chunks := make(map[int][]byte)
+	hostname, err := s.getHostname(data)
+	if err != nil {
+		s.Logger.Errorf("get hostname error, %v", err)
+		chunks[0] = data
+		return chunks
+	}
+	s.Logger.Printf("Hostname %s", string(hostname))
+	index := bytes.Index(data, hostname)
+	if index == -1 {
+		return nil
+	}
+	// before sni
+	chunks[0] = data[0:index]
+	// sni
+	chunks[1] = data[index : index+len(hostname)]
+	// after sni
+	chunks[2] = data[index+len(hostname):]
+	return chunks
+}
+
+func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool) {
+	buffer := make([]byte, 64*1024) // Increased buffer size
+
 	for index := 0; ; index++ {
-		nr, er := src.Read(buf)
-		if nr > 0 {
-			var nw, ew = 0, error(nil)
-			if index == 0 && split {
-				chunks := s.getChunkedPackets(buf[0:nr])
-				for i, chunk := range chunks {
-					// if its before sni
-					lengthMin, lengthMax := 0, 0
-					if i == 0 {
-						lengthMin, lengthMax = s.ChunksLengthBeforeSni[0], s.ChunksLengthBeforeSni[1]
-					} else if i == 1 { // if its sni
-						lengthMin, lengthMax = s.SniChunksLength[0], s.SniChunksLength[1]
-					} else { // if its after sni
-						lengthMin, lengthMax = s.ChunksLengthAfterSni[0], s.ChunksLengthAfterSni[1]
-					}
-					position := 0
-					for {
-						length := rand.Intn(lengthMax-lengthMin) + lengthMin
-						delay := rand.Intn(s.DelayBetweenChunks[1]-s.DelayBetweenChunks[0]) + s.DelayBetweenChunks[0]
-						ppl := position + length
-						if ppl > len(chunk) {
-							ppl = len(chunk)
-						}
-						tnw, ew := dst.Write(chunk[position:ppl])
-						if ew != nil {
-							return
-						}
-						nw += tnw
-						position = ppl
-						if position == len(chunk) {
-							break
-						}
-						time.Sleep(time.Duration(delay) * time.Millisecond)
-					}
-				}
+		bytesRead, err := src.Read(buffer)
+		if bytesRead > 0 {
+			var bytesWritten int
+
+			if index == 0 && shouldSplit {
+				chunks := s.getChunkedPackets(buffer[:bytesRead])
+				bytesWritten = s.sendSplitChunks(dst, chunks)
 			} else {
-				nw, ew = dst.Write(buf[0:nr])
+				bytesWritten, _ = dst.Write(buffer[:bytesRead]) // Ignore the error since it's checked later
 			}
-			if nw < 0 || nr < nw {
-				nw = 0
-				if ew == nil {
-					return
-				}
-			}
-			if ew != nil {
-				return
-			}
-			if nr != nw {
+
+			if bytesWritten != bytesRead {
 				return
 			}
 		}
-		if er != nil {
+
+		if err != nil {
 			return
 		}
 	}
 }
 
+func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) int {
+	bytesWritten := 0
+	for _, chunk := range chunks {
+		chunkLengthMin, chunkLengthMax := s.ChunksLengthBeforeSni[0], s.ChunksLengthBeforeSni[1]
+
+		if len(chunks) > 1 {
+			chunkLengthMin, chunkLengthMax = s.ChunksLengthAfterSni[0], s.ChunksLengthAfterSni[1]
+		}
+
+		position := 0
+		for {
+			chunkLength := rand.Intn(chunkLengthMax-chunkLengthMin) + chunkLengthMin
+			delay := rand.Intn(s.DelayBetweenChunks[1]-s.DelayBetweenChunks[0]) + s.DelayBetweenChunks[0]
+			endPosition := position + chunkLength
+			if endPosition > len(chunk) {
+				endPosition = len(chunk)
+			}
+			bytesWrittenNow, errWrite := dst.Write(chunk[position:endPosition])
+			if errWrite != nil {
+				return bytesWritten
+			}
+			bytesWritten += bytesWrittenNow
+			position = endPosition
+			if position == len(chunk) {
+				break
+			}
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+		}
+	}
+	return bytesWritten
+}
 func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest *socks5.Request) error {
 	// get , dohClient *doh.Client from context
 	dohClient := s.DoHClient
@@ -321,8 +319,8 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 		return err
 	}
 	defer rConn.Close()
-	go s.c(writer, rConn, false)
-	s.c(rConn, socksRequest.Reader, true)
+	go s.sendChunks(writer, rConn, false)
+	s.sendChunks(rConn, socksRequest.Reader, true)
 	// terminate the connection
 	return <-closeSignal
 }
@@ -363,6 +361,7 @@ func (s *Server) resolve(fqdn string, dohClient *doh.Client) (string, error) {
 		return "", err
 	}
 
+	fmt.Println(exchange.Answer[0])
 	s.Logger.Printf("resolve %s to %s", fqdn, exchange.Answer[0].String())
 	record := strings.Fields(exchange.Answer[0].String())
 	ttl, err := strconv.Atoi(record[1])
