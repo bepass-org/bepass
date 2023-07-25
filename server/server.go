@@ -13,6 +13,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ameshkov/dnscrypt/v2"
@@ -198,7 +199,6 @@ func (s *Server) getCompressionLength(data []byte, index int) (int, int, error) 
 
 	return compressionLength, newIndex, nil
 }
-
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 	chunks := make(map[int][]byte)
 	hostname, err := s.getHostname(data)
@@ -213,31 +213,28 @@ func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 		return nil
 	}
 	// before sni
-	chunks[0] = data[0:index]
+	chunks[0] = make([]byte, index)
+	copy(chunks[0], data[:index])
 	// sni
-	chunks[1] = data[index : index+len(hostname)]
+	chunks[1] = make([]byte, len(hostname))
+	copy(chunks[1], data[index:index+len(hostname)])
 	// after sni
-	chunks[2] = data[index+len(hostname):]
+	chunks[2] = make([]byte, len(data)-index-len(hostname))
+	copy(chunks[2], data[index+len(hostname):])
 	return chunks
 }
 
 func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool) {
-	buffer := make([]byte, 64*1024) // Increased buffer size
+	buffer := make([]byte, 256*1024) // Increased buffer size
 
 	for index := 0; ; index++ {
 		bytesRead, err := src.Read(buffer)
 		if bytesRead > 0 {
-			var bytesWritten int
-
 			if index == 0 && shouldSplit {
 				chunks := s.getChunkedPackets(buffer[:bytesRead])
-				bytesWritten = s.sendSplitChunks(dst, chunks)
+				go s.sendSplitChunks(dst, chunks) // Use goroutine for concurrent I/O
 			} else {
-				bytesWritten, _ = dst.Write(buffer[:bytesRead]) // Ignore the error since it's checked later
-			}
-
-			if bytesWritten != bytesRead {
-				return
+				_, _ = dst.Write(buffer[:bytesRead]) // Ignore the error since it's checked later
 			}
 		}
 
@@ -247,36 +244,39 @@ func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool) {
 	}
 }
 
-func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) int {
-	bytesWritten := 0
+func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
+	var wg sync.WaitGroup
+	wg.Add(len(chunks)) // Use wait group to synchronize goroutines
 	for _, chunk := range chunks {
-		chunkLengthMin, chunkLengthMax := s.ChunksLengthBeforeSni[0], s.ChunksLengthBeforeSni[1]
+		go func(c []byte) {
+			defer wg.Done()
+			chunkLengthMin, chunkLengthMax := s.ChunksLengthBeforeSni[0], s.ChunksLengthBeforeSni[1]
 
-		if len(chunks) > 1 {
-			chunkLengthMin, chunkLengthMax = s.ChunksLengthAfterSni[0], s.ChunksLengthAfterSni[1]
-		}
+			if len(chunks) > 1 {
+				chunkLengthMin, chunkLengthMax = s.ChunksLengthAfterSni[0], s.ChunksLengthAfterSni[1]
+			}
 
-		position := 0
-		for {
-			chunkLength := rand.Intn(chunkLengthMax-chunkLengthMin) + chunkLengthMin
-			delay := rand.Intn(s.DelayBetweenChunks[1]-s.DelayBetweenChunks[0]) + s.DelayBetweenChunks[0]
-			endPosition := position + chunkLength
-			if endPosition > len(chunk) {
-				endPosition = len(chunk)
+			position := 0
+			for {
+				chunkLength := rand.Intn(chunkLengthMax-chunkLengthMin) + chunkLengthMin
+				delay := rand.Intn(s.DelayBetweenChunks[1]-s.DelayBetweenChunks[0]) + s.DelayBetweenChunks[0]
+				endPosition := position + chunkLength
+				if endPosition > len(c) {
+					endPosition = len(c)
+				}
+				_, errWrite := dst.Write(c[position:endPosition])
+				if errWrite != nil {
+					return
+				}
+				position = endPosition
+				if position == len(c) {
+					break
+				}
+				time.Sleep(time.Duration(delay) * time.Millisecond)
 			}
-			bytesWrittenNow, errWrite := dst.Write(chunk[position:endPosition])
-			if errWrite != nil {
-				return bytesWritten
-			}
-			bytesWritten += bytesWrittenNow
-			position = endPosition
-			if position == len(chunk) {
-				break
-			}
-			time.Sleep(time.Duration(delay) * time.Millisecond)
-		}
+		}(chunk)
 	}
-	return bytesWritten
+	wg.Wait()
 }
 func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest *socks5.Request) error {
 	// get , dohClient *doh.Client from context
