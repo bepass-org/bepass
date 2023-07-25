@@ -188,40 +188,41 @@ func getExtensionBlock(data []byte) ([]byte, error) {
 	 *   data[...38+5]     - start of SessionID (length bit)
 	 *   data[38+5]        - length of SessionID
 	 */
-	var index = TLSHeaderLength + 38
+	dataLen := len(data)
+	index := TLSHeaderLength + 38
 
-	if len(data) <= index+1 {
-		return []byte{}, fmt.Errorf("not enough bits to be a Client Hello")
+	if dataLen <= index+1 {
+		return nil, fmt.Errorf("not enough bits to be a Client Hello")
 	}
 
+	sessionIDLength := int(data[index])
+	newIndex := index + 1 + sessionIDLength
 	/* Index is at SessionID Length bit */
-	if newIndex := index + 1 + int(data[index]); (newIndex + 2) < len(data) {
-		index = newIndex
-	} else {
-		return []byte{}, fmt.Errorf("not enough bytes for the SessionID")
+	if newIndex+2 >= dataLen {
+		return nil, fmt.Errorf("not enough bytes for the SessionID")
 	}
+	index = newIndex
 
-	/* Index is at Cipher List Length bits */
-	if newIndex := index + 2 + lengthFromData(data, index); (newIndex + 1) < len(data) {
-		index = newIndex
-	} else {
-		return []byte{}, fmt.Errorf("not enough bytes for the Cipher List")
+	cipherListLength := lengthFromData(data, index)
+	newIndex = index + 2 + cipherListLength
+	if newIndex+1 >= dataLen {
+		return nil, fmt.Errorf("not enough bytes for the Cipher List")
 	}
+	index = newIndex
 
-	/* Index is now at the compression length bit */
-	if newIndex := index + 1 + int(data[index]); newIndex < len(data) {
-		index = newIndex
-	} else {
-		return []byte{}, fmt.Errorf("not enough bytes for the compression length")
+	compressionLength := int(data[index])
+	newIndex = index + 1 + compressionLength
+	if newIndex >= dataLen {
+		return nil, fmt.Errorf("not enough bytes for the compression length")
 	}
-
+	index = newIndex
 	/* Now we're at the Extension start */
 	if len(data[index:]) == 0 {
 		return nil, fmt.Errorf("no extensions")
 	}
+
 	return data[index:], nil
 }
-
 func c(dst io.Writer, src io.Reader, split bool) {
 	buf := make([]byte, 32*1024)
 	for index := 0; ; index++ {
