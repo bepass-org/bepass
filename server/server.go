@@ -2,6 +2,7 @@ package server
 
 import (
 	"bepass/doh"
+	"bepass/logger"
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bytes"
@@ -31,17 +32,18 @@ type Server struct {
 	SniChunksLength       [2]int
 	ChunksLengthAfterSni  [2]int
 	DelayBetweenChunks    [2]int
+	Logger                *logger.Std
 }
 
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 	chunks := make(map[int][]byte)
 	hostname, err := s.getHostname(data)
 	if err != nil {
-		fmt.Println(err)
+		s.Logger.Errorf("get hostname error, %v", err)
 		chunks[0] = data
 		return chunks
 	}
-	fmt.Println("Hostname", string(hostname))
+	s.Logger.Printf("Hostname %s", string(hostname))
 	index := bytes.Index(data, hostname)
 	if index == -1 {
 		return nil
@@ -287,7 +289,7 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 	if dest.FQDN != "" {
 		ip, err := s.resolve(dest.FQDN, dohClient)
 		if err != nil {
-			fmt.Printf("resolve error, %v\n", err)
+			s.Logger.Errorf("resolve error, %v", err)
 			if err := socks5.SendReply(writer, statute.RepHostUnreachable, nil); err != nil {
 				return fmt.Errorf("failed to send reply, %v", err)
 			}
@@ -297,13 +299,13 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 			dialDest = ip + ":" + strconv.Itoa(dest.Port)
 		}
 	} else {
-		fmt.Println("no need to resolve", socksRequest.RawDestAddr)
+		s.Logger.Printf("no need to resolve %s", socksRequest.RawDestAddr)
 	}
 	if err := socks5.SendReply(writer, statute.RepSuccess, nil); err != nil {
-		fmt.Printf("failed to send reply, %v\n", err)
+		s.Logger.Errorf("failed to send reply, %v", err)
 		return fmt.Errorf("failed to send reply, %v", err)
 	}
-	fmt.Println(dialDest)
+	s.Logger.Printf("dialing %s", dialDest)
 	rAddr, err := net.ResolveTCPAddr("tcp", dialDest)
 	if err != nil {
 		panic(err)
@@ -311,7 +313,7 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 
 	rConn, err := net.DialTCP("tcp", nil, rAddr)
 	if err != nil {
-		fmt.Println("unable to connect to", dialDest)
+		s.Logger.Errorf("unable to connect to %s, %v", dialDest, err)
 		return err
 	}
 	err = rConn.SetNoDelay(true)
@@ -330,7 +332,7 @@ func (s *Server) resolve(fqdn string, dohClient *doh.Client) (string, error) {
 		fqdn += "."
 	}
 	if s.Cache.Get(fqdn) != nil {
-		fmt.Println("use dns cache")
+		s.Logger.Printf("use dns cache")
 		return s.Cache.Get(fqdn).Value(), nil
 	}
 	// Create a DNS request
@@ -357,11 +359,11 @@ func (s *Server) resolve(fqdn string, dohClient *doh.Client) (string, error) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
+		s.Logger.Errorf("resolve error, %v", err)
 		return "", err
 	}
 
-	fmt.Println(exchange.Answer[0])
+	s.Logger.Printf("resolve %s to %s", fqdn, exchange.Answer[0].String())
 	record := strings.Fields(exchange.Answer[0].String())
 	ttl, err := strconv.Atoi(record[1])
 	if err != nil {

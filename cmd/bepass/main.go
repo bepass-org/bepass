@@ -2,9 +2,11 @@ package main
 
 import (
 	"bepass/doh"
+	"bepass/logger"
 	"bepass/server"
 	"bepass/socks5"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -75,6 +77,8 @@ func main() {
 			} else {
 				config.ResolveSystem = "DNSCrypt"
 			}
+			stdLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
+			appLogger := logger.NewLogger(stdLogger)
 
 			serverHandler := &server.Server{
 				TLSHeaderLength:       config.TLSHeaderLength,
@@ -88,6 +92,7 @@ func main() {
 				Cache:                 cache,
 				ResolveSystem:         config.ResolveSystem,
 				DoHClient:             config.DoHClient,
+				Logger:                appLogger,
 			}
 
 			s5 := socks5.NewServer(
