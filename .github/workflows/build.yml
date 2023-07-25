@@ -146,7 +146,6 @@ jobs:
 
       - name: Copy README.md & LICENSE
         run: |
-          mv -f resources/* build_assets
           cp ${GITHUB_WORKSPACE}/README.md ./build_assets/README.md
           cp ${GITHUB_WORKSPACE}/LICENSE ./build_assets/LICENSE
 
