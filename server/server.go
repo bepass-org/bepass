@@ -282,14 +282,13 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 	// get , dohClient *doh.Client from context
 	dohClient := s.DoHClient
 	dialDest := socksRequest.RawDestAddr.String()
-	closeSignal := make(chan error)
 	dest := socksRequest.RawDestAddr
 	if dest.FQDN != "" {
 		ip, err := s.resolve(dest.FQDN, dohClient)
 		if err != nil {
 			s.Logger.Errorf("resolve error, %v", err)
 			if err := socks5.SendReply(writer, statute.RepHostUnreachable, nil); err != nil {
-				return fmt.Errorf("failed to send reply, %v", err)
+				s.Logger.Errorf("failed to send reply, %v", err)
 			}
 			return err
 		} else {
@@ -301,14 +300,13 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 	}
 	if err := socks5.SendReply(writer, statute.RepSuccess, nil); err != nil {
 		s.Logger.Errorf("failed to send reply, %v", err)
-		return fmt.Errorf("failed to send reply, %v", err)
+		return err
 	}
 	s.Logger.Printf("dialing %s", dialDest)
 	rAddr, err := net.ResolveTCPAddr("tcp", dialDest)
 	if err != nil {
 		panic(err)
 	}
-
 	rConn, err := net.DialTCP("tcp", nil, rAddr)
 	if err != nil {
 		s.Logger.Errorf("unable to connect to %s, %v", dialDest, err)
@@ -319,9 +317,33 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 		return err
 	}
 	defer rConn.Close()
-	go s.sendChunks(writer, rConn, false)
-	s.sendChunks(rConn, socksRequest.Reader, true)
-	// terminate the connection
+
+	// Use a buffered channel to avoid blocking senders
+	closeSignal := make(chan error, 1)
+
+	// Use a WaitGroup to wait for goroutines to complete
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine to send chunks from the reader
+	go func() {
+		defer wg.Done()
+		s.sendChunks(rConn, socksRequest.Reader, true)
+	}()
+
+	// Goroutine to send chunks to the writer
+	go func() {
+		defer wg.Done()
+		s.sendChunks(writer, rConn, false)
+	}()
+
+	// Wait for goroutines to complete
+	go func() {
+		wg.Wait()
+		close(closeSignal)
+	}()
+
+	// Return any error that occurred during transmission
 	return <-closeSignal
 }
 
