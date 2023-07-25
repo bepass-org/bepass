@@ -115,6 +115,12 @@ jobs:
       - name: Checkout codebase
         uses: actions/checkout@v3
         
+      - name: Show workflow information 
+        run: |
+          export _NAME=$GOOS-$GOARCH$GOARM$GOMIPS
+          echo "GOOS: $GOOS, GOARCH: $GOARCH, GOARM: $GOARM, GOMIPS: $GOMIPS, RELEASE_NAME: $_NAME"
+          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+        
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
