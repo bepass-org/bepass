@@ -348,29 +348,26 @@ func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest
 }
 
 func (s *Server) resolve(fqdn string, dohClient *doh.Client) (string, error) {
-	if strings.LastIndex(fqdn, ".") != len(fqdn)-1 {
+	if !strings.HasSuffix(fqdn, ".") {
 		fqdn += "."
 	}
+
 	if s.Cache.Get(fqdn) != nil {
 		s.Logger.Printf("use dns cache")
 		return s.Cache.Get(fqdn).Value(), nil
 	}
-	// Create a DNS request
+
 	req := dns.Msg{}
 	req.Id = dns.Id()
 	req.RecursionDesired = true
-	req.Question = []dns.Question{
-		{
-			Name:   fqdn,
-			Qtype:  dns.TypeA,
-			Qclass: dns.ClassINET,
-		},
-	}
+	req.Question = []dns.Question{{
+		Name:   fqdn,
+		Qtype:  dns.TypeA,
+		Qclass: dns.ClassINET,
+	}}
 
-	var (
-		exchange *dns.Msg
-		err      error
-	)
+	var exchange *dns.Msg
+	var err error
 
 	if s.ResolveSystem == "doh" {
 		exchange, err = s.resolveThroughDOH(&req, dohClient)
@@ -379,20 +376,23 @@ func (s *Server) resolve(fqdn string, dohClient *doh.Client) (string, error) {
 	}
 
 	if err != nil {
-		s.Logger.Errorf("resolve error, %v", err)
+		s.Logger.Errorf("resolve error: %v", err)
 		return "", err
 	}
 
-	fmt.Println(exchange.Answer[0])
-	s.Logger.Printf("resolve %s to %s", fqdn, exchange.Answer[0].String())
-	record := strings.Fields(exchange.Answer[0].String())
+	answer := exchange.Answer[0]
+	s.Logger.Printf("resolve %s to %s", fqdn, answer.String())
+
+	record := strings.Fields(answer.String())
 	ttl, err := strconv.Atoi(record[1])
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("invalid TTL value: %v", err)
 	}
+
 	if record[3] == "CNAME" {
 		return s.resolve(record[4], dohClient)
 	}
+
 	s.Cache.Set(fqdn, record[4], time.Duration(ttl)*time.Second)
 	return record[4], nil
 }
