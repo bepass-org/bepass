@@ -102,15 +102,6 @@ jobs:
       GOARM: ${{ matrix.goarm }}
       CGO_ENABLED: 0
     steps:
-      - name: Checkout codebase
-        uses: actions/checkout@v3
-
-      - name: Show workflow information 
-        run: |
-          export _NAME=$(jq ".[\"$GOOS-$GOARCH$GOARM$GOMIPS\"].friendlyName" -r < .github/build/friendly-filenames.json)
-          echo "GOOS: $GOOS, GOARCH: $GOARCH, GOARM: $GOARM, GOMIPS: $GOMIPS, RELEASE_NAME: $_NAME"
-          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
-
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -119,43 +110,27 @@ jobs:
 
       - name: Get project dependencies
         run: go mod download
-      
-      - name: Replace Custom to Commit ID
-        if: github.event_name != 'release'
-        run: |
-          ID=$(git rev-parse --short ${{ github.sha }})
-          if [ "${{ github.event_name }}" == 'pull_request' ]
-          then
-            ID=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})
-          fi
-          sed -i '/build/ s/Custom/'$ID'/' ./core/core.go
  
       - name: Build Bepass
         run: |
           mkdir -p build_assets
-          go build -v -o build_assets/xray -trimpath -ldflags "-s -w -buildid=" ./main
+          go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./main
 
       - name: Build background Bepass on Windows 
         if: matrix.goos == 'windows'
         run: |
-          go build -v -o build_assets/wxray.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./main
+          go build -v -o build_assets/wbepass.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./main
     
       - name: Build Mips softfloat Bepass
         if: matrix.goarch == 'mips' || matrix.goarch == 'mipsle'
         run: |
-          GOMIPS=softfloat go build -v -o build_assets/xray_softfloat -trimpath -ldflags "-s -w -buildid=" ./main
+          GOMIPS=softfloat go build -v -o build_assets/bepass_softfloat -trimpath -ldflags "-s -w -buildid=" ./main
 
       - name: Rename Windows Bepass
         if: matrix.goos == 'windows'
         run: |
           cd ./build_assets || exit 1
-          mv xray xray.exe
-
-      - name: Restore Cache
-        uses: actions/cache/restore@v3
-        with:
-          path: resources
-          key: xray-geodat-
+          mv bepass bepass.exe
 
       - name: Copy README.md & LICENSE
         run: |
