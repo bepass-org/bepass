@@ -1,27 +1,41 @@
 
 ## Disclamer
 
-**⚠ WARNING:** **This is a SHITTY Code use it at your own risk!**
+**⚠ WARNING:** **This is an EXPERIMENTAL Project, use it at your own risk!**
 # Bepass: A DPI bypassing tool!
 
-This is a simple tool that utilizes tls client hello splitting attack inorder to bypass iran's dpi system, it won't work if target machine's ip is blocked(Yet ?!)
+This is a simple tool that utilizes tls client hello splitting attack in order to bypass the iran's dpi system. It won't work if the target machine's ip is blocked(Yet ?!)
 
 
 
 ## Features
 
-- Supports all irans network careers with some tweaks in tls hello packet length
+- Supports all Iran's network careers with some tweaks in tls hello packet length
 - DOH spport
 - SDNS support
 - Cross platform
 
 
+## Deployment
+Just install go 1.19+ and run:
+
+```bash
+  go build .
+```
+
+It should give you an executable file, or you can simply run it in place.
+
+```bash
+  go run . -c config.json
+```
+
+
 ## Usage
 
-Inorder to deploy this project you should first find a "DOH" or "SDNS" link that works on your career, then edit config.json and fill the "RemoteDNSAddr" field respectivce to the dns link that you found!
+In order to deploy this project, you should first find a "DOH" or "SDNS" link that works on your ISP, then edit config.json and fill the "RemoteDNSAddr" field with the dns link that you found!
 \
 \
-For Example the following configuration will most likely work on IR-MCI:
+For example, the following configuration will most likely work on IR-MCI:
 
 
 ```json
@@ -38,24 +52,11 @@ For Example the following configuration will most likely work on IR-MCI:
 ```
 
 
-
-## Deployment
-Just install go 1.19+ and run:
-
-```bash
-  go build .
-```
-
-It should gives you an executable file. or you can simple run it in place
-
-```bash
-  go run . -c config.json
-```
 ## Roadmap
 
 - An android version
 
-- Finding a way to bypass the blocked ip's
+- Finding a way to bypass the blocked ips
 
 
 ## License
