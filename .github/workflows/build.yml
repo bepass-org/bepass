@@ -4,10 +4,24 @@
 name: Go
 
 on:
+  workflow_dispatch:
+  release:
+    types: [published]
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/*.yml"
   pull_request:
-    branches: [ "main" ]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/*.yml"
 
 jobs:
 
@@ -111,17 +125,17 @@ jobs:
       - name: Build Bepass
         run: |
           mkdir -p build_assets
-          go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./main
+          go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./
 
       - name: Build background Bepass on Windows 
         if: matrix.goos == 'windows'
         run: |
-          go build -v -o build_assets/wbepass.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./main
+          go build -v -o build_assets/wbepass.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./
     
       - name: Build Mips softfloat Bepass
         if: matrix.goarch == 'mips' || matrix.goarch == 'mipsle'
         run: |
-          GOMIPS=softfloat go build -v -o build_assets/bepass_softfloat -trimpath -ldflags "-s -w -buildid=" ./main
+          GOMIPS=softfloat go build -v -o build_assets/bepass_softfloat -trimpath -ldflags "-s -w -buildid=" ./
 
       - name: Rename Windows Bepass
         if: matrix.goos == 'windows'
