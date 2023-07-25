@@ -128,17 +128,17 @@ jobs:
       - name: Build Bepass
         run: |
           mkdir -p build_assets
-          go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./
+          go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./cmd
 
       - name: Build background Bepass on Windows 
         if: matrix.goos == 'windows'
         run: |
-          go build -v -o build_assets/wbepass.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./
+          go build -v -o build_assets/wbepass.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./cmd
     
       - name: Build Mips softfloat Bepass
         if: matrix.goarch == 'mips' || matrix.goarch == 'mipsle'
         run: |
-          GOMIPS=softfloat go build -v -o build_assets/bepass_softfloat -trimpath -ldflags "-s -w -buildid=" ./
+          GOMIPS=softfloat go build -v -o build_assets/bepass_softfloat -trimpath -ldflags "-s -w -buildid=" ./cmd
 
       - name: Rename Windows Bepass
         if: matrix.goos == 'windows'
@@ -146,9 +146,9 @@ jobs:
           cd ./build_assets || exit 1
           mv bepass bepass.exe
 
-      - name: Copy readme.md & LICENSE
+      - name: Copy README.md & LICENSE
         run: |
-          cp ${GITHUB_WORKSPACE}/readme.md ./build_assets/README.md
+          cp ${GITHUB_WORKSPACE}/README.md ./build_assets/README.md
           cp ${GITHUB_WORKSPACE}/LICENSE ./build_assets/LICENSE
 
       - name: Create ZIP archive
