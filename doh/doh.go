@@ -27,7 +27,6 @@ func WithTimeout(t time.Duration) ClientOption {
 
 type Client struct {
 	opt *clientOptions
-	cli *http.Client
 }
 
 func NewClient(opts ...ClientOption) *Client {
@@ -37,9 +36,6 @@ func NewClient(opts ...ClientOption) *Client {
 	}
 	return &Client{
 		opt: o,
-		cli: &http.Client{
-			Timeout: o.Timeout,
-		},
 	}
 }
 
@@ -50,19 +46,16 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 		origID   = req.Id
 	)
 
-	// Set DNS ID as zero accoreding to RFC8484 (cache friendly)
+	// Set DNS ID as zero according to RFC8484 (cache friendly)
 	req.Id = 0
 	buf, err = req.Pack()
-	b64 = make([]byte, base64.RawURLEncoding.EncodedLen(len(buf)))
 	if err != nil {
 		return
 	}
+	b64 = make([]byte, base64.RawURLEncoding.EncodedLen(len(buf)))
 	base64.RawURLEncoding.Encode(b64, buf)
 
-	// No need to use hreq.URL.Query()
-	hreq, _ := http.NewRequest("GET", address+"?dns="+string(b64), nil)
-	hreq.Header.Add("Accept", DoHMediaType)
-	resp, err := c.cli.Do(hreq)
+	resp, err := http.Get(address + "?dns=" + string(b64))
 	if err != nil {
 		return
 	}

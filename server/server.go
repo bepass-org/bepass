@@ -36,11 +36,12 @@ type Server struct {
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 	chunks := make(map[int][]byte)
 	hostname, err := s.getHostname(data)
-	fmt.Println("Hostname", string(hostname))
 	if err != nil {
+		fmt.Println(err)
 		chunks[0] = data
 		return chunks
 	}
+	fmt.Println("Hostname", string(hostname))
 	index := bytes.Index(data, hostname)
 	if index == -1 {
 		return nil
@@ -280,7 +281,6 @@ func (s *Server) c(dst io.Writer, src io.Reader, split bool) {
 func (s *Server) Handle(socksCtx context.Context, writer io.Writer, socksRequest *socks5.Request) error {
 	// get , dohClient *doh.Client from context
 	dohClient := s.DoHClient
-	fmt.Println(socksRequest.RawDestAddr)
 	dialDest := socksRequest.RawDestAddr.String()
 	closeSignal := make(chan error)
 	dest := socksRequest.RawDestAddr
