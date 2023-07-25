@@ -97,19 +97,34 @@ func (s *Server) getSNBlock(data []byte) ([]byte, error) {
 	if extensionLength+4 > len(data) {
 		return nil, fmt.Errorf("extension size is invalid")
 	}
-	data = data[2 : extensionLength+2]
 
-	for index := 0; index+4 < len(data); {
-		blockLength := s.lengthFromData(data, index+2)
+	extensionData := data[2 : extensionLength+2]
+
+	for index := 0; index+4 < len(extensionData); {
+		blockLength := s.lengthFromData(extensionData, index+2)
 		endIndex := index + 4 + blockLength
-		if data[index] == 0x00 && data[index+1] == 0x00 {
-			return data[index+4 : endIndex], nil
+		if isSNServerName(extensionData[index:endIndex]) {
+			return extensionData[index+4 : endIndex], nil
 		}
 
 		index = endIndex
 	}
 
 	return nil, fmt.Errorf("SN block not found within the Extension block")
+}
+
+// isSNServerName returns true if the given data block is a server_name block with type 0.
+func isSNServerName(data []byte) bool {
+	if len(data) < 2 {
+		return false
+	}
+
+	// Check that the type is 0 (server_name)
+	if data[0] != 0x00 || data[1] != 0x00 {
+		return false
+	}
+
+	return true
 }
 
 // getExtensionBlock finds the extension block given a raw TLS Client Hello.
