@@ -15,16 +15,9 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/*.yml"
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/*.yml"
+      
 
 jobs:
-
   build:
     strategy:
       matrix:
@@ -121,7 +114,11 @@ jobs:
         with:
           go-version: '1.20'
           check-latest: true
-          
+      
+      - name: check whats happening
+        run: |
+          ls
+      
       - name: Build Bepass
         run: |
           mkdir -p build_assets
