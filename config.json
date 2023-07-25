@@ -1,0 +1,10 @@
+{
+  "TLSHeaderLength": 5,
+  "RemoteDNSAddr": "https://yarp.lefolgoc.net/dns-query",
+  "DnsCacheTTL": 30,
+  "BindAddress": "127.0.0.1:8085",
+  "ChunksLengthBeforeSni": [1, 5],
+  "SniChunksLength": [1, 5],
+  "ChunksLengthAfterSni": [1, 5],
+  "DelayBetweenChunks":   [1, 10]
+}
