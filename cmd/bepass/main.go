@@ -4,92 +4,112 @@ import (
 	"bepass/doh"
 	"bepass/server"
 	"bepass/socks5"
-	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
-	config                Config
-	TLSHeaderLength       = 5
-	dohClient             *doh.Client
-	Cache                 *ttlcache.Cache[string, string]
-	resolveSystem         string
-	remoteDNSAddr         string
-	chunksLengthBeforeSni = [2]int{1, 5}
-	sniChunksLength       = [2]int{1, 5}
-	chunksLengthAfterSni  = [2]int{1, 5}
-	delayBetweenChunks    = [2]int{1, 10}
-	bindAddr              = "127.0.0.1:8085"
-	dnsCacheTTL           = 30
-	flgConfigPath         = flag.String("c", "./config.json", "Path to configuration file")
+	cache *ttlcache.Cache[string, string]
 )
 
 type Config struct {
-	TLSHeaderLength       int
-	DnsCacheTTL           int
-	RemoteDNSAddr         string
-	BindAddress           string
-	ChunksLengthBeforeSni [2]int
-	SniChunksLength       [2]int
-	ChunksLengthAfterSni  [2]int
-	DelayBetweenChunks    [2]int
+	TLSHeaderLength       int         `mapstructure:"TLSHeaderLength"`
+	DnsCacheTTL           int         `mapstructure:"DnsCacheTTL"`
+	RemoteDNSAddr         string      `mapstructure:"RemoteDNSAddr"`
+	BindAddress           string      `mapstructure:"BindAddress"`
+	ChunksLengthBeforeSni [2]int      `mapstructure:"ChunksLengthBeforeSni"`
+	SniChunksLength       [2]int      `mapstructure:"SniChunksLength"`
+	ChunksLengthAfterSni  [2]int      `mapstructure:"ChunksLengthAfterSni"`
+	DelayBetweenChunks    [2]int      `mapstructure:"DelayBetweenChunks"`
+	ResolveSystem         string      `mapstructure:"-"`
+	DoHClient             *doh.Client `mapstructure:"-"`
+}
+
+func loadConfig() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	err := viper.ReadInConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	var config Config
+	err = viper.Unmarshal(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+func createCache(ttl int) *ttlcache.Cache[string, string] {
+	return ttlcache.New(
+		ttlcache.WithTTL[string, string](time.Duration(int64(ttl) * int64(time.Minute))),
+	)
 }
 
 func main() {
-	flag.Parse()
+	var configPath string
 
-	configData, err := os.ReadFile(*flgConfigPath) // just pass the file name
-	if err != nil {
-		fmt.Print(err)
-	}
-	err = json.Unmarshal(configData, &config)
-	if err != nil {
-		panic(err)
-	}
-	TLSHeaderLength = config.TLSHeaderLength
-	remoteDNSAddr = config.RemoteDNSAddr
-	chunksLengthBeforeSni = config.ChunksLengthBeforeSni
-	sniChunksLength = config.SniChunksLength
-	chunksLengthAfterSni = config.ChunksLengthAfterSni
-	delayBetweenChunks = config.DelayBetweenChunks
-	bindAddr = config.BindAddress
-	dnsCacheTTL = config.DnsCacheTTL
+	rootCmd := &cobra.Command{
+		Use:   "bepass",
+		Short: "bepass is a socks5 proxy server",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config, err := loadConfig()
+			if err != nil {
+				return err
+			}
 
-	if strings.Contains(remoteDNSAddr, "https://") {
-		resolveSystem = "doh"
-		dohClient = doh.NewClient(doh.WithTimeout(10 * time.Second))
-	} else {
-		resolveSystem = "DNSCrypt"
+			cache = createCache(config.DnsCacheTTL)
+			go cache.Start()
+
+			if strings.HasPrefix(config.RemoteDNSAddr, "https://") {
+				config.ResolveSystem = "doh"
+				config.DoHClient = doh.NewClient(doh.WithTimeout(10 * time.Second))
+			} else {
+				config.ResolveSystem = "DNSCrypt"
+			}
+
+			serverHandler := &server.Server{
+				TLSHeaderLength:       config.TLSHeaderLength,
+				DnsCacheTTL:           config.DnsCacheTTL,
+				RemoteDNSAddr:         config.RemoteDNSAddr,
+				BindAddress:           config.BindAddress,
+				ChunksLengthBeforeSni: config.ChunksLengthBeforeSni,
+				SniChunksLength:       config.SniChunksLength,
+				ChunksLengthAfterSni:  config.ChunksLengthAfterSni,
+				DelayBetweenChunks:    config.DelayBetweenChunks,
+				Cache:                 cache,
+				ResolveSystem:         config.ResolveSystem,
+				DoHClient:             config.DoHClient,
+			}
+
+			s5 := socks5.NewServer(
+				socks5.WithConnectHandle(serverHandler.Handle),
+			)
+			fmt.Println("starting socks server: " + config.BindAddress)
+			err = s5.ListenAndServe("tcp", config.BindAddress)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
 	}
-	cache := ttlcache.New[string, string](
-		ttlcache.WithTTL[string, string](time.Duration(int64(dnsCacheTTL) * int64(time.Minute))),
-	)
-	go cache.Start() // starts automatic expired item deletion
-	serverHandler := &server.Server{
-		TLSHeaderLength:       TLSHeaderLength,
-		DnsCacheTTL:           dnsCacheTTL,
-		RemoteDNSAddr:         remoteDNSAddr,
-		BindAddress:           bindAddr,
-		ChunksLengthBeforeSni: chunksLengthBeforeSni,
-		SniChunksLength:       sniChunksLength,
-		ChunksLengthAfterSni:  chunksLengthAfterSni,
-		DelayBetweenChunks:    delayBetweenChunks,
-		Cache:                 cache,
-		ResolveSystem:         resolveSystem,
-		DoHClient:             dohClient,
-	}
-	s5 := socks5.NewServer(
-		socks5.WithConnectHandle(serverHandler.Handle),
-	)
-	fmt.Println("starting socks server: " + bindAddr)
-	err = s5.ListenAndServe("tcp", bindAddr)
-	if err != nil {
-		panic("unable to tun socks server")
+
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "./config.json", "Path to configuration file")
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	viper.SetEnvPrefix("bepass")
+	viper.AutomaticEnv()
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
