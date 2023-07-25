@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bepass/bufferpool"
 	"bepass/doh"
 	"bepass/socks5"
 	"bepass/socks5/statute"
@@ -21,18 +20,17 @@ import (
 )
 
 type Server struct {
-	bufferPool            bufferpool.BufPool
 	TLSHeaderLength       int
 	DnsCacheTTL           int
 	RemoteDNSAddr         string
 	BindAddress           string
+	Cache                 *ttlcache.Cache[string, string]
+	ResolveSystem         string
+	DoHClient             *doh.Client
 	ChunksLengthBeforeSni [2]int
 	SniChunksLength       [2]int
 	ChunksLengthAfterSni  [2]int
 	DelayBetweenChunks    [2]int
-	Cache                 *ttlcache.Cache[string, string]
-	ResolveSystem         string
-	DoHClient             *doh.Client
 }
 
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
@@ -75,6 +73,10 @@ func (s *Server) getHostname(data []byte) ([]byte, error) {
 
 /* Return the length computed from the two octets starting at index */
 func (s *Server) lengthFromData(data []byte, index int) int {
+	if index < 0 || index+1 >= len(data) {
+		return 0
+	}
+
 	b1 := int(data[index])
 	b2 := int(data[index+1])
 
