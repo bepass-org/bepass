@@ -105,26 +105,21 @@ func (s *Server) getSNIBlock(data []byte) ([]byte, error) {
 	)
 }
 
-// getSNBlock /* Given a TLS Extensions data block, go ahead and find the SN block */
+// getSNBlock finds the SN block given a TLS Extensions data block.
 func (s *Server) getSNBlock(data []byte) ([]byte, error) {
-	index := 0
-
-	if len(data) < 2 {
-		return []byte{}, fmt.Errorf("not enough bytes to be an SN block")
+	if len(data) < 4 {
+		return nil, fmt.Errorf("not enough bytes to be an SN block")
 	}
 
-	extensionLength := s.lengthFromData(data, index)
-	if extensionLength+2 > len(data) {
-		return []byte{}, fmt.Errorf("extension looks bonkers")
+	extensionLength := s.lengthFromData(data, 0)
+	if extensionLength+4 > len(data) {
+		return nil, fmt.Errorf("extension size is invalid")
 	}
 	data = data[2 : extensionLength+2]
 
-	for {
-		if index+4 >= len(data) {
-			break
-		}
-		length := s.lengthFromData(data, index+2)
-		endIndex := index + 4 + length
+	for index := 0; index+4 < len(data); {
+		blockLength := s.lengthFromData(data, index+2)
+		endIndex := index + 4 + blockLength
 		if data[index] == 0x00 && data[index+1] == 0x00 {
 			return data[index+4 : endIndex], nil
 		}
@@ -132,19 +127,11 @@ func (s *Server) getSNBlock(data []byte) ([]byte, error) {
 		index = endIndex
 	}
 
-	return []byte{}, fmt.Errorf(
-		"finished parsing the Extension block without finding an SN block",
-	)
+	return nil, fmt.Errorf("SN block not found within the Extension block")
 }
 
-// getExtensionBlock /* Given a raw TLS Client Hello, go ahead and find all the Extensions */
+// getExtensionBlock finds the extension block given a raw TLS Client Hello.
 func (s *Server) getExtensionBlock(data []byte) ([]byte, error) {
-	/*   data[0]           - content type
-	 *   data[1], data[2]  - major/minor version
-	 *   data[3], data[4]  - total length
-	 *   data[...38+5]     - start of SessionID (length bit)
-	 *   data[38+5]        - length of SessionID
-	 */
 	dataLen := len(data)
 	index := s.TLSHeaderLength + 38
 
@@ -152,33 +139,83 @@ func (s *Server) getExtensionBlock(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("not enough bits to be a Client Hello")
 	}
 
-	sessionIDLength := int(data[index])
-	newIndex := index + 1 + sessionIDLength
-	/* Index is at SessionID Length bit */
-	if newIndex+2 >= dataLen {
-		return nil, fmt.Errorf("not enough bytes for the SessionID")
+	_, newIndex, err := s.getSessionIDLength(data, index)
+	if err != nil {
+		return nil, err
 	}
 	index = newIndex
 
-	cipherListLength := s.lengthFromData(data, index)
-	newIndex = index + 2 + cipherListLength
-	if newIndex+1 >= dataLen {
-		return nil, fmt.Errorf("not enough bytes for the Cipher List")
+	_, newIndex, err = s.getCipherListLength(data, index)
+	if err != nil {
+		return nil, err
 	}
 	index = newIndex
 
-	compressionLength := int(data[index])
-	newIndex = index + 1 + compressionLength
-	if newIndex >= dataLen {
-		return nil, fmt.Errorf("not enough bytes for the compression length")
+	_, newIndex, err = s.getCompressionLength(data, index)
+	if err != nil {
+		return nil, err
 	}
 	index = newIndex
-	/* Now we're at the Extension start */
+
 	if len(data[index:]) == 0 {
 		return nil, fmt.Errorf("no extensions")
 	}
 
 	return data[index:], nil
+}
+
+// getSessionIDLength retrieves the session ID length from the TLS Client Hello data.
+func (s *Server) getSessionIDLength(data []byte, index int) (int, int, error) {
+	dataLen := len(data)
+
+	if index+1 >= dataLen {
+		return 0, 0, fmt.Errorf("not enough bytes for the SessionID")
+	}
+
+	sessionIDLength := int(data[index])
+	newIndex := index + 1 + sessionIDLength
+
+	if newIndex+2 >= dataLen {
+		return 0, 0, fmt.Errorf("not enough bytes for the SessionID")
+	}
+
+	return sessionIDLength, newIndex, nil
+}
+
+// getCipherListLength retrieves the cipher list length from the TLS Client Hello data.
+func (s *Server) getCipherListLength(data []byte, index int) (int, int, error) {
+	dataLen := len(data)
+
+	if index+2 >= dataLen {
+		return 0, 0, fmt.Errorf("not enough bytes for the Cipher List")
+	}
+
+	cipherListLength := s.lengthFromData(data, index)
+	newIndex := index + 2 + cipherListLength
+
+	if newIndex+1 >= dataLen {
+		return 0, 0, fmt.Errorf("not enough bytes for the Cipher List")
+	}
+
+	return cipherListLength, newIndex, nil
+}
+
+// getCompressionLength retrieves the compression length from the TLS Client Hello data.
+func (s *Server) getCompressionLength(data []byte, index int) (int, int, error) {
+	dataLen := len(data)
+
+	if index+1 >= dataLen {
+		return 0, 0, fmt.Errorf("not enough bytes for the compression length")
+	}
+
+	compressionLength := int(data[index])
+	newIndex := index + 1 + compressionLength
+
+	if newIndex >= dataLen {
+		return 0, 0, fmt.Errorf("not enough bytes for the compression length")
+	}
+
+	return compressionLength, newIndex, nil
 }
 func (s *Server) c(dst io.Writer, src io.Reader, split bool) {
 	buf := make([]byte, 32*1024)
@@ -338,27 +375,19 @@ func (s *Server) resolve(fqdn string, dohClient *doh.Client) (string, error) {
 }
 
 func (s *Server) resolveThroughDOH(req *dns.Msg, dohClient *doh.Client) (*dns.Msg, error) {
-	//exchange, _, err := dohClient.Exchange(req, "https://de-fra.doh.sb/dns-query")
-	//exchange, _, err := dohClient.Exchange(req, "https://yarp.lefolgoc.net/dns-query")
 	exchange, _, err := dohClient.Exchange(req, s.RemoteDNSAddr)
 	if err != nil {
 		return nil, err
 	}
-	if exchange.Answer == nil || len(exchange.Answer) == 0 {
+	if len(exchange.Answer) == 0 {
 		return nil, fmt.Errorf("no answer")
 	}
 	return exchange, nil
 }
 
 func (s *Server) resolveThroughSDNS(req *dns.Msg) (*dns.Msg, error) {
-	// AdGuard DNS stamp
-	//stampStr := "sdns://AQcAAAAAAAAAFTEzMy4xMzAuMTE4LjEwMzo1MDQ0MyB7SI0q4_Ff8lFRUCbjPtcAQ3HfdWlLxyGDUUNc3NUZdiIyLmRuc2NyeXB0LWNlcnQuc2FsZG5zMDIudHlwZXEub3Jn"
-	//stampStr := "sdns://AQIAAAAAAAAADjM3LjEyMC4xOTMuMjE5IDEzcq1ZVjLCQWuHLwmPhRvduWUoTGy-mk8ZCWQw26laHjIuZG5zY3J5cHQtY2VydC5jcnlwdG9zdG9ybS5pcw"
-
-	// Initializing the DNSCrypt client
 	c := dnscrypt.Client{Net: "tcp", Timeout: 10 * time.Second}
 
-	// Fetching and validating the server certificate
 	resolverInfo, err := c.Dial(s.RemoteDNSAddr)
 	if err != nil {
 		return nil, err
@@ -368,7 +397,7 @@ func (s *Server) resolveThroughSDNS(req *dns.Msg) (*dns.Msg, error) {
 	if err != nil {
 		return nil, err
 	}
-	if exchange.Answer == nil || len(exchange.Answer) == 0 {
+	if len(exchange.Answer) == 0 {
 		return nil, fmt.Errorf("no answer")
 	}
 	return exchange, nil
