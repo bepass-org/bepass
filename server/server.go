@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bepass/cache"
 	"bepass/doh"
 	"bepass/logger"
 	"bepass/socks5"
@@ -11,14 +12,11 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ameshkov/dnscrypt/v2"
-	"github.com/jellydator/ttlcache/v3"
 	"github.com/miekg/dns"
 )
 
@@ -31,7 +29,7 @@ type ChunkConfig struct {
 
 type Server struct {
 	RemoteDNSAddr string
-	Cache         *ttlcache.Cache[string, string]
+	Cache         *cache.Cache
 	ResolveSystem string
 	DoHClient     *doh.Client
 	ChunkConfig   ChunkConfig
@@ -40,34 +38,66 @@ type Server struct {
 
 // getHostname returns the Server Name Indication (SNI) from a TLS Client Hello message.
 func (s *Server) getHostname(data []byte) ([]byte, error) {
-	re := regexp.MustCompile(`\x00\x00\x00\x00\x00(?P<Length>.)(?P<SNI>.{0,255})`)
-	matches := re.FindSubmatch(data)
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("could not find SNI in Server Name TLS Extension block")
+	const (
+		sniTypeByte     = 0x00
+		sniLengthOffset = 2
+	)
+
+	// Find the SNI type byte
+	sniTypeIndex := bytes.IndexByte(data, sniTypeByte)
+	if sniTypeIndex == -1 {
+		return nil, fmt.Errorf("could not find SNI type byte in Server Hello message")
 	}
-	return matches[2], nil
+
+	// Ensure sufficient data to read the SNI length and value
+	if len(data) < sniTypeIndex+sniLengthOffset+1 {
+		return nil, fmt.Errorf("insufficient data to read SNI length")
+	}
+
+	// Read the SNI length
+	sniLength := int(data[sniTypeIndex+sniLengthOffset])
+
+	// Calculate the index of the SNI value
+	sniValueIndex := sniTypeIndex + sniLengthOffset + 1
+
+	// Ensure sufficient data to read the SNI value
+	if len(data) < sniValueIndex+sniLength {
+		return nil, fmt.Errorf("insufficient data to read SNI value")
+	}
+
+	// Extract and return the SNI value
+	sniValue := data[sniValueIndex : sniValueIndex+sniLength]
+	return sniValue, nil
 }
 
 // getChunkedPackets splits the data into chunks based on SNI and chunk lengths.
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
+	const (
+		chunkIndexHostname  = 0
+		chunkIndexSNIValue  = 1
+		chunkIndexRemainder = 2
+	)
+
 	chunks := make(map[int][]byte)
 	hostname, err := s.getHostname(data)
 	if err != nil {
 		s.Logger.Errorf("get hostname error: %v", err)
-		chunks[0] = data
+		chunks[chunkIndexRemainder] = data
 		return chunks
 	}
+
 	s.Logger.Printf("Hostname %s", string(hostname))
 	index := bytes.Index(data, hostname)
 	if index == -1 {
 		return nil
 	}
-	chunks[0] = make([]byte, index)
-	copy(chunks[0], data[:index])
-	chunks[1] = make([]byte, len(hostname))
-	copy(chunks[1], data[index:index+len(hostname)])
-	chunks[2] = make([]byte, len(data)-index-len(hostname))
-	copy(chunks[2], data[index+len(hostname):])
+
+	chunks[chunkIndexHostname] = make([]byte, index)
+	copy(chunks[chunkIndexHostname], data[:index])
+	chunks[chunkIndexSNIValue] = make([]byte, len(hostname))
+	copy(chunks[chunkIndexSNIValue], data[index:index+len(hostname)])
+	chunks[chunkIndexRemainder] = make([]byte, len(data)-index-len(hostname))
+	copy(chunks[chunkIndexRemainder], data[index+len(hostname):])
 	return chunks
 }
 
@@ -80,21 +110,21 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte, config Ch
 
 	for _, chunk := range chunks {
 		position := 0
-		for {
+
+		for position < len(chunk) {
 			chunkLength := rand.Intn(chunkLengthMax-chunkLengthMin) + chunkLengthMin
-			delay := rand.Intn(config.Delay[1]-config.Delay[0]) + config.Delay[0]
-			endPosition := position + chunkLength
-			if endPosition > len(chunk) {
-				endPosition = len(chunk)
+			if chunkLength > len(chunk)-position {
+				chunkLength = len(chunk) - position
 			}
-			_, errWrite := dst.Write(chunk[position:endPosition])
+
+			delay := rand.Intn(config.Delay[1]-config.Delay[0]) + config.Delay[0]
+
+			_, errWrite := dst.Write(chunk[position : position+chunkLength])
 			if errWrite != nil {
 				return
 			}
-			position = endPosition
-			if position == len(chunk) {
-				break
-			}
+
+			position += chunkLength
 			time.Sleep(time.Duration(delay) * time.Millisecond)
 		}
 	}
@@ -199,9 +229,9 @@ func (s *Server) Resolve(fqdn string, dohClient *doh.Client) (string, error) {
 	}
 
 	// Check the cache for fqdn
-	if cachedValue := s.Cache.Get(fqdn); cachedValue != nil {
+	if cachedValue, _ := s.Cache.Get(fqdn); cachedValue != nil {
 		s.Logger.Printf("using cached value for %s", fqdn)
-		return cachedValue.Value(), nil
+		return cachedValue.(string), nil
 	}
 
 	// Build request message
@@ -223,11 +253,9 @@ func (s *Server) Resolve(fqdn string, dohClient *doh.Client) (string, error) {
 	default:
 		exchange, err = s.resolveDNSWithDNSCrypt(&req)
 	}
-
 	if err != nil {
 		return "", err
 	}
-
 	// Parse answer and store in cache
 	answer := exchange.Answer[0]
 	s.Logger.Printf("resolved %s to %s", fqdn, answer.String())
@@ -235,14 +263,8 @@ func (s *Server) Resolve(fqdn string, dohClient *doh.Client) (string, error) {
 	if record[3] == "CNAME" {
 		return s.Resolve(record[4], dohClient)
 	}
-
-	ttl, err := strconv.Atoi(record[1])
-	if err != nil {
-		return "", fmt.Errorf("invalid TTL value: %v", err)
-	}
-
 	ip := record[4]
-	s.Cache.Set(fqdn, ip, time.Duration(ttl)*time.Second)
+	s.Cache.Set(fqdn, ip)
 	return ip, nil
 }
 
