@@ -79,20 +79,19 @@ func main() {
 			}
 			stdLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
 			appLogger := logger.NewLogger(stdLogger)
+			chunkConfig := server.ChunkConfig{
+				BeforeSniLength: config.SniChunksLength,
+				AfterSniLength:  config.ChunksLengthAfterSni,
+				Delay:           config.DelayBetweenChunks,
+			}
 
 			serverHandler := &server.Server{
-				TLSHeaderLength:       config.TLSHeaderLength,
-				DnsCacheTTL:           config.DnsCacheTTL,
-				RemoteDNSAddr:         config.RemoteDNSAddr,
-				BindAddress:           config.BindAddress,
-				ChunksLengthBeforeSni: config.ChunksLengthBeforeSni,
-				SniChunksLength:       config.SniChunksLength,
-				ChunksLengthAfterSni:  config.ChunksLengthAfterSni,
-				DelayBetweenChunks:    config.DelayBetweenChunks,
-				Cache:                 cache,
-				ResolveSystem:         config.ResolveSystem,
-				DoHClient:             config.DoHClient,
-				Logger:                appLogger,
+				RemoteDNSAddr: config.RemoteDNSAddr,
+				Cache:         cache,
+				ResolveSystem: config.ResolveSystem,
+				DoHClient:     config.DoHClient,
+				Logger:        appLogger,
+				ChunkConfig:   chunkConfig,
 			}
 
 			s5 := socks5.NewServer(
