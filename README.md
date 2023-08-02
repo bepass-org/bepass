@@ -11,21 +11,25 @@ This is a simple tool that utilizes tls client hello splitting attack in order t
 ## Features
 
 - Supports all Iran's network careers with some tweaks in tls hello packet length
-- DOH spport
+- DOH support
 - SDNS support
 - Cross platform
 
 
 ## Deployment
-Just install go 1.19+ and run:
+You can download the latest build from release or Just install go 1.19+ and run:
 
 ```bash
+  git clone https://github.com/uoosef/bepass.git
+  cd bepass/cmd/bepass
   go build .
 ```
 
 It should give you an executable file, or you can simply run it in place.
 
 ```bash
+  git clone https://github.com/uoosef/bepass.git
+  cd bepass/cmd/bepass
   go run . -c config.json
 ```
 
@@ -54,7 +58,9 @@ For example, the following configuration will most likely work on IR-MCI:
 
 ## Roadmap
 
-- An android version
+- Self-Hosted DOH (WIP)
+  
+- An android version (WIP)
 
 - Finding a way to bypass the blocked ips
 
