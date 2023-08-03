@@ -12,25 +12,25 @@ import (
 
 const DoHMediaType = "application/dns-message"
 
-type clientOptions struct {
+type ClientOptions struct {
 	Timeout time.Duration // Timeout for one DNS query
 }
 
-type ClientOption func(*clientOptions) error
+type ClientOption func(*ClientOptions) error
 
 func WithTimeout(t time.Duration) ClientOption {
-	return func(o *clientOptions) error {
+	return func(o *ClientOptions) error {
 		o.Timeout = t
 		return nil
 	}
 }
 
 type Client struct {
-	opt *clientOptions
+	opt *ClientOptions
 }
 
 func NewClient(opts ...ClientOption) *Client {
-	o := new(clientOptions)
+	o := &ClientOptions{Timeout: 5 * time.Second} // Default timeout of 5 seconds
 	for _, f := range opts {
 		f(o)
 	}
@@ -55,7 +55,8 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 	b64 = make([]byte, base64.RawURLEncoding.EncodedLen(len(buf)))
 	base64.RawURLEncoding.Encode(b64, buf)
 
-	resp, err := http.Get(address + "?dns=" + string(b64))
+	client := &http.Client{Timeout: c.opt.Timeout}
+	resp, err := client.Get(address + "?dns=" + string(b64))
 	if err != nil {
 		return
 	}
