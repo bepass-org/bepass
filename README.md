@@ -15,6 +15,14 @@ This is a simple tool that utilizes tls client hello splitting attack in order t
 - SDNS support
 - Cross platform
 
+## Build
+You can build debug and release version as:
+
+```bash
+  git clone https://github.com/uoosef/bepass.git
+  make # For debug version
+  make release # For Release version
+```
 
 ## Deployment
 You can download the latest build from release or Just install go 1.19+ and run:
