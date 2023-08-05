@@ -82,8 +82,8 @@ func TunnelToWorkerThroughWs(ctx context.Context, w io.Writer, req *socks5.Reque
 	// Wait
 	err = <-errCh
 	if err != nil &&
-		!strings.Contains(err.Error(), "websocket: close 1006") &&
-		!strings.Contains(err.Error(), "websocket: close 1005") {
+		(!strings.Contains(err.Error(), "websocket: close 1006") ||
+			!strings.Contains(err.Error(), "websocket: close 1005")) {
 		fmt.Println("transport error:", err)
 	}
 

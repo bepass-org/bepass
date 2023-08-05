@@ -10,6 +10,9 @@
 // @ts-ignore
 import { connect } from 'cloudflare:sockets';
 
+const proxyIPs = ['edgetunnel.anycast.eu.org', 'cdn.anycast.eu.org'];
+let proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
+
 const WS_READY_STATE_OPEN = 1;
 const WS_READY_STATE_CLOSING = 2;
 
@@ -153,7 +156,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
 
     // if the cf connect tcp socket have no incoming data, we retry to redirect ip
     async function retry() {
-        const tcpSocket = await connectAndWrite(addressRemote, portRemote)
+        const tcpSocket = await connectAndWrite(proxyIP || addressRemote, portRemote)
         // no matter retry success or not, close websocket
         tcpSocket.closed.catch(error => {
             console.log('retry tcpSocket closed error', error);
