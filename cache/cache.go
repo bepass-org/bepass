@@ -5,28 +5,58 @@ import (
 	"time"
 )
 
-type Cache struct {
-	data     map[string]interface{}
-	duration time.Duration
-	mutex    sync.RWMutex
+type cacheEntry struct {
+	value     interface{}
+	expiration time.Time
 }
 
-func NewCache(duration time.Duration) *Cache {
+type Cache struct {
+	data          map[string]cacheEntry
+	defaultDuration time.Duration
+	mutex         sync.RWMutex
+}
+
+func NewCache(defaultDuration time.Duration) *Cache {
 	return &Cache{
-		data:     make(map[string]interface{}),
-		duration: duration,
+		data:           make(map[string]cacheEntry),
+		defaultDuration: defaultDuration,
 	}
 }
 
-func (c *Cache) Set(key string, value interface{}) {
+func (c *Cache) Set(key string, value interface{}, durations ...time.Duration) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.data[key] = value
+
+	var duration time.Duration
+	if len(durations) > 0 {
+		duration = durations[0]
+	} else {
+		duration = c.defaultDuration
+	}
+
+	expiration := time.Now().Add(duration)
+	c.data[key] = cacheEntry{
+		value:     value,
+		expiration: expiration,
+	}
 }
 
 func (c *Cache) Get(key string) (interface{}, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	val, found := c.data[key]
-	return val, found
+
+	entry, found := c.data[key]
+	if !found {
+		return nil, false
+	}
+
+	if entry.expiration.Before(time.Now()) {
+		// Item has expired, remove it from cache
+		c.mutex.Lock()
+		delete(c.data, key)
+		c.mutex.Unlock()
+		return nil, false
+	}
+
+	return entry.value, true
 }
