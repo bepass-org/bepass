@@ -7,8 +7,8 @@
   "SniChunksLength": [1, 5],
   "ChunksLengthAfterSni": [1, 5],
   "DelayBetweenChunks":   [1, 10],
-  "WorkerAddress": "https://hello-world-rapid-boat-c250.uoosef.workers.dev/dns-query",
+  "WorkerAddress": "https://<YOUR_WORKER_ADDRESS>/dns-query",
   "WorkerIPPortAddress": "104.31.16.161:443",
-  "WorkerEnabled": true,
-  "WorkerDNSOnly": false
+  "WorkerEnabled": false,
+  "WorkerDNSOnly": true
 }
