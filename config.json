@@ -6,5 +6,9 @@
   "ChunksLengthBeforeSni": [1, 5],
   "SniChunksLength": [1, 5],
   "ChunksLengthAfterSni": [1, 5],
-  "DelayBetweenChunks":   [1, 10]
+  "DelayBetweenChunks":   [1, 10],
+  "WorkerAddress": "https://<YOUR_WORKER_ADDRESS>/dns-query",
+  "WorkerIPPortAddress": "104.31.16.161:443",
+  "WorkerEnabled": false,
+  "WorkerDNSOnly": true
 }

@@ -14,11 +14,11 @@ clean:
 
 build: create_dirs
 	@echo "Building..."
-	go build -o $(BUILD_DIR)/bepass cmd/bepass/main.go
+	go build -o $(BUILD_DIR)/bepass cmd/cli/main.go
 
 release: create_dirs
 	@echo "Building Release..."
-	go build -ldflags '-s -w' -o $(BUILD_DIR)/bepass cmd/bepass/main.go
+	go build -ldflags '-s -w' -o $(BUILD_DIR)/bepass cmd/cli/main.go
 
 test: build
 	@echo "Running tests..."

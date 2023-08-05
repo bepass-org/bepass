@@ -2,9 +2,12 @@
 ## Disclamer
 
 **⚠ WARNING:** **This is an EXPERIMENTAL Project, use it at your own risk!**
-# Bepass: A DPI bypassing tool!
+# Bepass: A DPI bypassing tool and Socks over Cloudflare Worker Proxy!
 
 This is a simple tool that utilizes tls client hello splitting attack in order to bypass the iran's dpi system. It won't work if the target machine's ip is blocked(Yet ?!)
+\
+\
+It also allow you to deploy a free and fast vless like proxy in cloudflare workers, just copy the worker.js to your worker and fill configs accordingly it will do the rest
 
 
 
@@ -20,6 +23,7 @@ You can build debug and release version as:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
+  cd bepass
   make # For debug version
   make release # For Release version
 ```
@@ -29,7 +33,7 @@ You can download the latest build from release or Just install go 1.19+ and run:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
-  cd bepass/cmd/bepass
+  cd bepass/cmd/cli
   go build .
 ```
 
@@ -37,7 +41,7 @@ It should give you an executable file, or you can simply run it in place.
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
-  cd bepass/cmd/bepass
+  cd bepass/cmd/cli
   go run . -c config.json
 ```
 
@@ -59,15 +63,37 @@ For example, the following configuration will most likely work on IR-MCI:
   "ChunksLengthBeforeSni": [1, 5],
   "SniChunksLength": [1, 5],
   "ChunksLengthAfterSni": [1, 5],
-  "DelayBetweenChunks":   [1, 10]
+  "DelayBetweenChunks":   [1, 10],
+  "WorkerAddress": "https://<YOUR_WORKER_ADDRESS>/dns-query",
+  "WorkerIPPortAddress": "<CLEAN_CLOUDFLARE_IP>:443",
+  "WorkerEnabled": true,
+  "WorkerDNSOnly": true
+}
+```
+If you cant find any working DOH Servers you can deploy worker.js code to your CF worker and change config.json accordingly
+\
+\
+If you just want to use the DOH over worker set WorkerDNSOnly, true
+```json
+{
+  ... ,
+  "WorkerDNSOnly": true
+}
+```
+But if you want a full-fledged tcp socks5 proxy over worker set WorkerDNSOnly, false. please consider that your udp traffic wouldn't go through worker because cf doesn't support udp outgoing sockets currently
+```json
+{
+  ... ,
+  "WorkerDNSOnly": false
 }
 ```
 
-
 ## Roadmap
 
-- Self-Hosted DOH (WIP)
-  
+- Self-Hosted DOH (DONE)
+
+- TCP PROXY Over Worker (Done)
+
 - An android version (WIP)
 
 - Finding a way to bypass the blocked ips

@@ -6,12 +6,14 @@ import (
 	"bepass/logger"
 	"bepass/socks5"
 	"bepass/socks5/statute"
+	"bepass/transport"
 	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -20,11 +22,19 @@ import (
 	"github.com/miekg/dns"
 )
 
-// Constants for chunk lengths and delays.
+// ChunkConfig Constants for chunk lengths and delays.
 type ChunkConfig struct {
 	BeforeSniLength [2]int
 	AfterSniLength  [2]int
 	Delay           [2]int
+}
+
+// WorkerConfig Constants for cloudflare worker.
+type WorkerConfig struct {
+	WorkerAddress       string
+	WorkerIPPortAddress string
+	WorkerEnabled       bool
+	WorkerDNSOnly       bool
 }
 
 type Server struct {
@@ -33,8 +43,12 @@ type Server struct {
 	ResolveSystem string
 	DoHClient     *doh.Client
 	ChunkConfig   ChunkConfig
+	WorkerConfig  WorkerConfig
 	Logger        *logger.Std
+	BindAddress   string
 }
+
+var sniRegex = regexp.MustCompile(`^(?:[a-z0-9-]+\.)+[a-z]+$`)
 
 // getHostname returns the Server Name Indication (SNI) from a TLS Client Hello message.
 func (s *Server) getHostname(data []byte) ([]byte, error) {
@@ -42,6 +56,10 @@ func (s *Server) getHostname(data []byte) ([]byte, error) {
 		sniTypeByte     = 0x00
 		sniLengthOffset = 2
 	)
+
+	if data[0] != 0x16 {
+		return nil, fmt.Errorf("not a tls packet")
+	}
 
 	// Find the SNI type byte
 	sniTypeIndex := bytes.IndexByte(data, sniTypeByte)
@@ -54,20 +72,23 @@ func (s *Server) getHostname(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("insufficient data to read SNI length")
 	}
 
-	// Read the SNI length
-	sniLength := int(data[sniTypeIndex+sniLengthOffset])
-
-	// Calculate the index of the SNI value
-	sniValueIndex := sniTypeIndex + sniLengthOffset + 1
-
-	// Ensure sufficient data to read the SNI value
-	if len(data) < sniValueIndex+sniLength {
-		return nil, fmt.Errorf("insufficient data to read SNI value")
+	var sni string
+	var prev byte
+	for i := 0; i < len(data); i++ {
+		if prev == 0 && data[i] == 0 {
+			start := i + 2
+			end := start + int(data[i+1])
+			if start < end && end < len(data) {
+				str := string(data[start:end])
+				if sniRegex.MatchString(str) {
+					sni = str
+					break
+				}
+			}
+		}
+		prev = data[i]
 	}
-
-	// Extract and return the SNI value
-	sniValue := data[sniValueIndex : sniValueIndex+sniLength]
-	return sniValue, nil
+	return []byte(sni), nil
 }
 
 // getChunkedPackets splits the data into chunks based on SNI and chunk lengths.
@@ -132,6 +153,17 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte, config Ch
 
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
 func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) error {
+	if s.WorkerConfig.WorkerEnabled &&
+		!s.WorkerConfig.WorkerDNSOnly &&
+		!strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) {
+		if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
+			s.Logger.Errorf("failed to send reply: %v", err)
+			return err
+		}
+		// , s.WorkerConfig.WorkerIPPortAddress
+		return transport.TunnelToWorkerThroughWs(ctx, w, req, s.WorkerConfig.WorkerAddress, s.BindAddress, s.Logger)
+	}
+
 	dest, err := s.resolveDestination(ctx, req)
 	if err != nil {
 		return err
@@ -170,11 +202,10 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) e
 
 // resolveDestination resolves the destination address using DNS.
 func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (*net.TCPAddr, error) {
-	dohClient := s.DoHClient
 	dest := req.RawDestAddr
 
 	if dest.FQDN != "" {
-		ip, err := s.Resolve(dest.FQDN, dohClient)
+		ip, err := s.Resolve(dest.FQDN)
 		if err != nil {
 			return nil, err
 		}
@@ -202,16 +233,17 @@ func (s *Server) connectToDestination(addr *net.TCPAddr) (*net.TCPConn, error) {
 // sendChunks sends chunks from src to dst
 func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	buffer := make([]byte, 256*1024)
+	dataBuffer := make([]byte, 256*1024)
 
 	for index := 0; ; index++ {
-		bytesRead, err := src.Read(buffer)
+		bytesRead, err := src.Read(dataBuffer)
 		if bytesRead > 0 {
-			if index == 0 && shouldSplit {
-				chunks := s.getChunkedPackets(buffer[:bytesRead])
+			// check if it's the first packet and its tls packet
+			if index == 0 && dataBuffer[0] == 0x16 && shouldSplit {
+				chunks := s.getChunkedPackets(dataBuffer[:bytesRead])
 				s.sendSplitChunks(dst, chunks, s.ChunkConfig)
 			} else {
-				_, _ = dst.Write(buffer[:bytesRead])
+				_, _ = dst.Write(dataBuffer[:bytesRead])
 			}
 		}
 
@@ -222,7 +254,12 @@ func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool, wg *
 }
 
 // Resolve resolves the FQDN to an IP address using the specified resolution mechanism.
-func (s *Server) Resolve(fqdn string, dohClient *doh.Client) (string, error) {
+func (s *Server) Resolve(fqdn string) (string, error) {
+	if s.WorkerConfig.WorkerEnabled &&
+		strings.Contains(s.WorkerConfig.WorkerAddress, fqdn) {
+		return strings.Split(s.WorkerConfig.WorkerIPPortAddress, ":")[0], nil
+	}
+
 	// Ensure fqdn ends with a period
 	if !strings.HasSuffix(fqdn, ".") {
 		fqdn += "."
@@ -261,7 +298,7 @@ func (s *Server) Resolve(fqdn string, dohClient *doh.Client) (string, error) {
 	s.Logger.Printf("resolved %s to %s", fqdn, answer.String())
 	record := strings.Fields(answer.String())
 	if record[3] == "CNAME" {
-		return s.Resolve(record[4], dohClient)
+		return s.Resolve(record[4])
 	}
 	ip := record[4]
 	s.Cache.Set(fqdn, ip)
@@ -270,8 +307,14 @@ func (s *Server) Resolve(fqdn string, dohClient *doh.Client) (string, error) {
 
 // resolveDNSWithDOH resolves DNS using DNS-over-HTTP (DoH) client.
 func (s *Server) resolveDNSWithDOH(req *dns.Msg) (*dns.Msg, error) {
-	dohClient := doh.NewClient()
-	exchange, _, err := dohClient.Exchange(req, s.RemoteDNSAddr)
+	needsFragmentation := false
+	dnsAddr := s.RemoteDNSAddr
+	if s.WorkerConfig.WorkerEnabled && s.WorkerConfig.WorkerDNSOnly {
+		needsFragmentation = true
+		dnsAddr = s.WorkerConfig.WorkerAddress
+	}
+
+	exchange, _, err := s.DoHClient.Exchange(req, dnsAddr, needsFragmentation)
 	if err != nil {
 		return nil, err
 	}
