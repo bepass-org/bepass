@@ -95,11 +95,11 @@ func (s *Server) getHostnameRegex(data []byte) ([]byte, error) {
 func (s *Server) getHostname(data []byte) ([]byte, error) {
 	extensions, err := s.getExtensionBlock(data)
 	if err != nil {
-		return s.getHostnameRegex(data)
+		return nil, err
 	}
 	sn, err := s.getSNBlock(extensions)
 	if err != nil {
-		return s.getHostnameRegex(data)
+		return nil, err
 	}
 	sni, err := s.getSNIBlock(sn)
 	if err != nil {
