@@ -1,6 +1,7 @@
 package wsconnadapter
 
 import (
+	"errors"
 	"github.com/gorilla/websocket"
 	"io"
 	"net"
@@ -36,7 +37,7 @@ func (a *Adapter) Read(b []byte) (int, error) {
 		}
 
 		if messageType != websocket.BinaryMessage {
-			//return 0, errors.New("unexpected websocket message type")
+			return 0, errors.New("unexpected websocket message type")
 		}
 
 		a.reader = reader

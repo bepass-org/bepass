@@ -215,9 +215,9 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 		}
 		return fmt.Errorf("listen udp failed, %v", err)
 	}
-	defer bindLn.Close()
+	//defer bindLn.Close()
 
-	sf.logger.Errorf("target addr %v, listen addr: %s", target.RemoteAddr(), bindLn.LocalAddr())
+	sf.logger.Info("target addr ", target.RemoteAddr(), "listen addr: ", bindLn.LocalAddr())
 	// send BND.ADDR and BND.PORT, client used
 	if err = SendReply(writer, statute.RepSuccess, bindLn.LocalAddr()); err != nil {
 		return fmt.Errorf("failed to send reply, %v", err)

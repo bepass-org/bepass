@@ -38,11 +38,14 @@ func wsDialer(workerAddress, socks5BindAddress string) (*websocket.Conn, error) 
 			config := tls.Config{
 				ServerName:         strings.Split(addr, ":")[0],
 				InsecureSkipVerify: true,
+				NextProtos:         []string{"http/1.1"},
+				MinVersion:         tls.VersionTLS10,
 			}
 			utlsConn := tls.UClient(plainConn, &config, tls.HelloAndroid_11_OkHttp)
 			err = utlsConn.Handshake()
 			if err != nil {
 				_ = plainConn.Close()
+				fmt.Println(err)
 				return nil, err
 			}
 			return utlsConn, nil
