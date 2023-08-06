@@ -172,7 +172,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 	if dest.FQDN != "" {
 		ctx, dest.IP, err = sf.resolver.Resolve(ctx, dest.FQDN)
 		if err != nil {
-			if err := SendReply(write, statute.RepHostUnreachable, nil); err != nil {
+			if err := SendReply(writer, statute.RepHostUnreachable, nil); err != nil {
 				return fmt.Errorf("failed to send reply, %v", err)
 			}
 			return fmt.Errorf("failed to resolve destination[%v], %v", dest.FQDN, err)
@@ -180,9 +180,9 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 	}
 
 	// Apply any address rewrites
-	req.DestAddr = req.RawDestAddr
+	request.DestAddr = request.RawDestAddr
 	if sf.rewriter != nil {
-		ctx, req.DestAddr = sf.rewriter.Rewrite(ctx, req)
+		ctx, request.DestAddr = sf.rewriter.Rewrite(ctx, request)
 	}
 	// Attempt to connect
 	dial := sf.dial
