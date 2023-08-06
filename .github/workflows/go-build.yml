@@ -161,7 +161,7 @@ jobs:
       - name: Create ZIP archive
         shell: bash
         run: |
-          pushd build_assets || exit 1
+          pushd ./bepass-cli/build_assets || exit 1
           touch -mt $(date +%Y01010000) *
           zip -9vr ../Bepass-${{ env.ASSET_NAME }}.zip .
           popd || exit 1
