@@ -50,19 +50,60 @@ type Server struct {
 
 var sniRegex = regexp.MustCompile(`^(?:[a-z0-9-]+\.)+[a-z]+$`)
 
+// getHostname returns the Server Name Indication (SNI) from a TLS Client Hello message.
+func (s *Server) getHostnameRegex(data []byte) ([]byte, error) {
+	const (
+		sniTypeByte     = 0x00
+		sniLengthOffset = 2
+	)
+
+	if data[0] != 0x16 {
+		return nil, fmt.Errorf("not a tls packet")
+	}
+
+	// Find the SNI type byte
+	sniTypeIndex := bytes.IndexByte(data, sniTypeByte)
+	if sniTypeIndex == -1 {
+		return nil, fmt.Errorf("could not find SNI type byte in Server Hello message")
+	}
+
+	// Ensure sufficient data to read the SNI length and value
+	if len(data) < sniTypeIndex+sniLengthOffset+1 {
+		return nil, fmt.Errorf("insufficient data to read SNI length")
+	}
+
+	var sni string
+	var prev byte
+	for i := 0; i < len(data); i++ {
+		if prev == 0 && data[i] == 0 {
+			start := i + 2
+			end := start + int(data[i+1])
+			if start < end && end < len(data) {
+				str := string(data[start:end])
+				if sniRegex.MatchString(str) {
+					sni = str
+					break
+				}
+			}
+		}
+		prev = data[i]
+	}
+	return []byte(sni), nil
+}
+
 // getHostname /* This function is basically all most folks want to invoke out of this
 func (s *Server) getHostname(data []byte) ([]byte, error) {
 	extensions, err := s.getExtensionBlock(data)
 	if err != nil {
-		return nil, err
+		return s.getHostnameRegex(data)
 	}
 	sn, err := s.getSNBlock(extensions)
 	if err != nil {
-		return nil, err
+		return s.getHostnameRegex(data)
 	}
 	sni, err := s.getSNIBlock(sn)
 	if err != nil {
-		return nil, err
+		return s.getHostnameRegex(data)
 	}
 	return sni, nil
 }
