@@ -165,6 +165,25 @@ func (sf *Server) handleBind(_ context.Context, writer io.Writer, _ *Request) er
 
 // handleAssociate is used to handle a connect command
 func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request *Request) error {
+	var err error
+
+	// Resolve the address if we have a FQDN
+	dest := request.RawDestAddr
+	if dest.FQDN != "" {
+		ctx, dest.IP, err = sf.resolver.Resolve(ctx, dest.FQDN)
+		if err != nil {
+			if err := SendReply(write, statute.RepHostUnreachable, nil); err != nil {
+				return fmt.Errorf("failed to send reply, %v", err)
+			}
+			return fmt.Errorf("failed to resolve destination[%v], %v", dest.FQDN, err)
+		}
+	}
+
+	// Apply any address rewrites
+	req.DestAddr = req.RawDestAddr
+	if sf.rewriter != nil {
+		ctx, req.DestAddr = sf.rewriter.Rewrite(ctx, req)
+	}
 	// Attempt to connect
 	dial := sf.dial
 	if dial == nil {
