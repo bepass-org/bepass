@@ -129,6 +129,7 @@ jobs:
       
       - name: move to bepass-cli
         run: |
+          ls
           cd bepass-cli
       
       - name: Build Bepass
