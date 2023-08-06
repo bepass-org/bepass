@@ -165,7 +165,7 @@ jobs:
           touch -mt $(date +%Y01010000) *
           zip -9vr ../Bepass-${{ env.ASSET_NAME }}.zip .
           popd || exit 1
-          FILE=./Bepass-${{ env.ASSET_NAME }}.zip
+          FILE=./bepass-cli/Bepass-${{ env.ASSET_NAME }}.zip
           DGST=$FILE.dgst
           for METHOD in {"md5","sha1","sha256","sha512"}
           do
