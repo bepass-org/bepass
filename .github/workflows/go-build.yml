@@ -174,20 +174,20 @@ jobs:
 
       - name: Change the name
         run: |
-          mv build_assets Bepass-${{ env.ASSET_NAME }}
+          mv ./bepass-cli/build_assets ./bepass-cli/Bepass-${{ env.ASSET_NAME }}
 
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: Bepass-${{ env.ASSET_NAME }}
           path: |
-            ./Bepass-${{ env.ASSET_NAME }}/*
+            ./bepass-cli/Bepass-${{ env.ASSET_NAME }}/*
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./Bepass-${{ env.ASSET_NAME }}.zip*
+          file: ./bepass-cli/Bepass-${{ env.ASSET_NAME }}.zip*
           tag: ${{ github.ref }}
           file_glob: true
