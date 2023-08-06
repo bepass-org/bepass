@@ -23,7 +23,7 @@ You can build debug and release version as:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
-  cd bepass
+  cd bepass/bepass-cli
   make # For debug version
   make release # For Release version
 ```
@@ -33,16 +33,16 @@ You can download the latest build from release or Just install go 1.19+ and run:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
-  cd bepass/cmd/cli
-  go build .
+  cd bepass/bepass-cli
+  go build ./cmd/cli/main.go
 ```
 
 It should give you an executable file, or you can simply run it in place.
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
-  cd bepass/cmd/cli
-  go run . -c config.json
+  cd bepass/bepass-cli
+  go run ./cmd/cli/main.go -c config.json
 ```
 
 
@@ -76,14 +76,12 @@ If you cant find any working DOH Servers you can deploy worker.js code to your C
 If you just want to use the DOH over worker set WorkerDNSOnly, true
 ```json
 {
-  ... ,
   "WorkerDNSOnly": true
 }
 ```
 But if you want a full-fledged tcp socks5 proxy over worker set WorkerDNSOnly, false. please consider that your udp traffic wouldn't go through worker because cf doesn't support udp outgoing sockets currently
 ```json
 {
-  ... ,
   "WorkerDNSOnly": false
 }
 ```

@@ -1,15 +1,16 @@
 package server
 
 import (
-	"bepass/cache"
-	"bepass/doh"
-	"bepass/logger"
-	"bepass/socks5"
-	"bepass/socks5/statute"
-	"bepass/transport"
+	"bepass-cli/cache"
+	"bepass-cli/doh"
+	"bepass-cli/logger"
+	"bepass-cli/socks5"
+	"bepass-cli/socks5/statute"
+	"bepass-cli/transport"
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/ameshkov/dnscrypt/v2"
 	"io"
 	"math/rand"
 	"net"
@@ -18,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ameshkov/dnscrypt/v2"
 	"github.com/miekg/dns"
 )
 
@@ -230,7 +230,7 @@ func (s *Server) connectToDestination(addr *net.TCPAddr) (*net.TCPConn, error) {
 	return conn, nil
 }
 
-// sendChunks sends chunks from src to dst
+// sendChunks sends chunks from bepass-cli to dst
 func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	dataBuffer := make([]byte, 256*1024)

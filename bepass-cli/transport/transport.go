@@ -1,10 +1,10 @@
 package transport
 
 import (
-	"bepass/logger"
-	"bepass/socks5"
-	"bepass/socks5/statute"
-	"bepass/wsconnadapter"
+	"bepass-cli/logger"
+	"bepass-cli/socks5"
+	"bepass-cli/socks5/statute"
+	"bepass-cli/wsconnadapter"
 	"context"
 	"fmt"
 	"github.com/gorilla/websocket"

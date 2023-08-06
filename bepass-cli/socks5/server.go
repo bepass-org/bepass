@@ -1,7 +1,7 @@
 package socks5
 
 import (
-	"bepass/bufferpool"
+	"bepass-cli/bufferpool"
 	"bufio"
 	"context"
 	"errors"
@@ -11,9 +11,9 @@ import (
 	"net"
 	"os"
 
-	"bepass/socks5/statute"
+	"bepass-cli/socks5/statute"
 
-	"bepass/logger"
+	"bepass-cli/logger"
 )
 
 // GPool is used to implement custom goroutine pool default use goroutine
@@ -57,6 +57,8 @@ type Server struct {
 	userConnectHandle   func(ctx context.Context, writer io.Writer, request *Request) error
 	userBindHandle      func(ctx context.Context, writer io.Writer, request *Request) error
 	userAssociateHandle func(ctx context.Context, writer io.Writer, request *Request) error
+	done                chan bool
+	listen              net.Listener
 }
 
 // NewServer creates a new Server
@@ -92,19 +94,26 @@ func NewServer(opts ...Option) *Server {
 // ListenAndServe is used to create a listener and serve on it
 func (sf *Server) ListenAndServe(network, addr string) error {
 	l, err := net.Listen(network, addr)
+	sf.listen = l
 	if err != nil {
 		return err
 	}
-	return sf.Serve(l)
+	return sf.Serve()
 }
 
 // Serve is used to serve internet from a listener
-func (sf *Server) Serve(l net.Listener) error {
-	defer l.Close()
+func (sf *Server) Serve() error {
 	for {
-		conn, err := l.Accept()
+		conn, err := sf.listen.Accept()
 		if err != nil {
-			return err
+			select {
+			case <-sf.done:
+				sf.logger.Info("Shutting socks5 server done")
+				return nil
+			default:
+				sf.logger.Errorf("Accept failed: %v", err)
+				return err
+			}
 		}
 		sf.goFunc(func() {
 			if err := sf.ServeConn(conn); err != nil {
@@ -112,6 +121,15 @@ func (sf *Server) Serve(l net.Listener) error {
 			}
 		})
 	}
+}
+
+func (sf *Server) Shutdown() error {
+	go func() { sf.done <- true }() // Shutting down the socks5 proxy
+	err := sf.listen.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ServeConn is used to serve a single connection.

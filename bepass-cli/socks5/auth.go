@@ -3,7 +3,7 @@ package socks5
 import (
 	"io"
 
-	"bepass/socks5/statute"
+	"bepass-cli/socks5/statute"
 )
 
 // AuthContext A Request encapsulates authentication state provided

@@ -1,10 +1,10 @@
 package socks5
 
 import (
+	"bepass-cli/socks5/statute"
 	"fmt"
 	"io"
 	"net"
-	"bepass/socks5/statute"
 )
 
 import (
@@ -334,7 +334,7 @@ type closeWriter interface {
 	CloseWrite() error
 }
 
-// Proxy is used to suffle data from src to destination, and sends errors
+// Proxy is used to suffle data from bepass-cli to destination, and sends errors
 // down a dedicated channel
 func (sf *Server) Proxy(dst io.Writer, src io.Reader) error {
 	buf := sf.bufferPool.Get()

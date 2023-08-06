@@ -1,20 +1,18 @@
-package main
+package core
 
 import (
+	"bepass-cli/cache"
+	"bepass-cli/doh"
+	"bepass-cli/logger"
+	"bepass-cli/server"
+	"bepass-cli/socks5"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-
-	"bepass/cache"
-	"bepass/doh"
-	"bepass/logger"
-	"bepass/server"
-	"bepass/socks5"
 )
 
 type Config struct {
@@ -34,28 +32,10 @@ type Config struct {
 	DoHClient             *doh.Client `mapstructure:"-"`
 }
 
-func loadConfig() (*Config, error) {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
-	}
+var s5 *socks5.Server
 
-	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
-}
-
-func runServer(cmd *cobra.Command, args []string) error {
-	config, err := loadConfig()
-	if err != nil {
-		return err
-	}
-
-	cache := cache.NewCache(time.Duration(config.DnsCacheTTL) * time.Second)
+func RunServer(config *Config, captureCTRLC bool) error {
+	appCache := cache.NewCache(time.Duration(config.DnsCacheTTL) * time.Second)
 
 	var resolveSystem string
 	var dohClient *doh.Client
@@ -87,7 +67,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	serverHandler := &server.Server{
 		RemoteDNSAddr: config.RemoteDNSAddr,
-		Cache:         cache,
+		Cache:         appCache,
 		ResolveSystem: resolveSystem,
 		DoHClient:     dohClient,
 		Logger:        appLogger,
@@ -96,7 +76,17 @@ func runServer(cmd *cobra.Command, args []string) error {
 		BindAddress:   config.BindAddress,
 	}
 
-	s5 := socks5.NewServer(
+	if captureCTRLC {
+		c := make(chan os.Signal)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			_ = ShutDown()
+			os.Exit(0)
+		}()
+	}
+
+	s5 = socks5.NewServer(
 		socks5.WithConnectHandle(serverHandler.Handle),
 	)
 
@@ -108,22 +98,6 @@ func runServer(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func main() {
-	var configPath string
-
-	rootCmd := &cobra.Command{
-		Use:   "cli",
-		Short: "cli is a socks5 proxy server",
-		RunE:  runServer,
-	}
-
-	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "./config.json", "Path to configuration file")
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	viper.SetEnvPrefix("cli")
-	viper.AutomaticEnv()
-
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+func ShutDown() error {
+	return s5.Shutdown()
 }

@@ -3,7 +3,7 @@ package socks5
 import (
 	"context"
 
-	"bepass/socks5/statute"
+	"bepass-cli/socks5/statute"
 )
 
 // RuleSet is used to provide custom rules to allow or prohibit actions
