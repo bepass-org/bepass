@@ -152,7 +152,7 @@ jobs:
       - name: Rename Windows Bepass
         if: matrix.goos == 'windows'
         run: |
-          cd ./build_assets || exit 1
+          cd ./bepass-cli/build_assets || exit 1
           mv bepass bepass.exe
 
       - name: Copy README.md & LICENSE
