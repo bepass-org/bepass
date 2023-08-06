@@ -136,12 +136,6 @@ jobs:
           cd bepass-cli
           mkdir -p build_assets
           go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./cmd/cli
-
-      - name: Build background Bepass on Windows 
-        if: matrix.goos == 'windows'
-        run: |
-          cd bepass-cli
-          go build -v -o build_assets/wbepass.exe -trimpath -ldflags "-s -w -H windowsgui -buildid=" ./cmd/cli
     
       - name: Build Mips softfloat Bepass
         if: matrix.goarch == 'mips' || matrix.goarch == 'mipsle'
