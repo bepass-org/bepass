@@ -59,7 +59,7 @@ func TunnelToWorkerThroughWs(ctx context.Context, w io.Writer, req *socks5.Reque
 	if err != nil {
 		return err
 	}
-	endpoint := fmt.Sprintf("wss://%s/connect?host=%s&port=%d", u.Host, req.RawDestAddr.FQDN, req.RawDestAddr.Port)
+	endpoint := fmt.Sprintf("wss://%s/connect?host=%s&port=%s", u.Host, strings.Split(req.DstAddr.String(), ":")[0], strings.Split(req.DstAddr.String(), ":")[1])
 	wsConn, err := wsDialer(endpoint, socks5BindAddress)
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {

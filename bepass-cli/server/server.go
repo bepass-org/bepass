@@ -155,7 +155,7 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte, config Ch
 func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) error {
 	if s.WorkerConfig.WorkerEnabled &&
 		!s.WorkerConfig.WorkerDNSOnly &&
-		!strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) {
+		(!strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
 		if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
 			s.Logger.Errorf("failed to send reply: %v", err)
 			return err
