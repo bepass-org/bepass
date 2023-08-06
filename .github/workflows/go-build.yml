@@ -134,6 +134,7 @@ jobs:
       
       - name: Build Bepass
         run: |
+          cd bepass-cli
           mkdir -p build_assets
           go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./cmd/cli
 
