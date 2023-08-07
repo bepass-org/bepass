@@ -18,7 +18,7 @@ import (
 	"github.com/eycorsican/go-tun2socks/core"
 	"github.com/eycorsican/go-tun2socks/proxy/socks"
 
-	bepassCore "bepass-cli/cmd/core"
+	bepassCore "bepass/cmd/core"
 
 	"github.com/songgao/water"
 )

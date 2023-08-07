@@ -1,7 +1,7 @@
 package socks5
 
 import (
-	"bepass-cli/bufferpool"
+	"bepass/bufferpool"
 	"bufio"
 	"context"
 	"errors"
@@ -11,9 +11,9 @@ import (
 	"net"
 	"os"
 
-	"bepass-cli/socks5/statute"
+	"bepass/socks5/statute"
 
-	"bepass-cli/logger"
+	"bepass/logger"
 )
 
 // GPool is used to implement custom goroutine pool default use goroutine

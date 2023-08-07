@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bepass-cli/cmd/core"
+	"bepass/cmd/core"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
