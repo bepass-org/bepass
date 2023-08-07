@@ -1,11 +1,11 @@
 package core
 
 import (
-	"bepass-cli/cache"
-	"bepass-cli/doh"
-	"bepass-cli/logger"
-	"bepass-cli/server"
-	"bepass-cli/socks5"
+	"bepass/cache"
+	"bepass/doh"
+	"bepass/logger"
+	"bepass/server"
+	"bepass/socks5"
 	"fmt"
 	"log"
 	"os"

@@ -1,8 +1,8 @@
 package socks5
 
 import (
-	"bepass-cli/bufferpool"
-	"bepass-cli/logger"
+	"bepass/bufferpool"
+	"bepass/logger"
 	"context"
 	"io"
 	"net"

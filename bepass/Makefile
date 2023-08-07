@@ -13,13 +13,21 @@ clean:
 	rm -rf $(DIRS)
 
 build: create_dirs
-	@echo "Building..."
+	@echo "Building Cli Version..."
 	go build -o $(BUILD_DIR)/bepass cmd/cli/main.go
 
 release: create_dirs
-	@echo "Building Release..."
+	@echo "Building Cli Release Version..."
 	go build -ldflags '-s -w' -o $(BUILD_DIR)/bepass cmd/cli/main.go
+
+gui: create_dirs
+	@echo "Building GUI version..."
+	go build $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
+
+gui-release: create_dirs
+	@echo "Building GUI Release Version..."
+	go build $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
 
 test: build
 	@echo "Running tests..."
-
+	# Later's some test cases would be added
