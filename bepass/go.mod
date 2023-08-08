@@ -7,6 +7,7 @@ replace github.com/eycorsican/go-tun2socks => github.com/trojan-gfw/go-tun2socks
 require (
 	fyne.io/fyne/v2 v2.3.5
 	github.com/ameshkov/dnscrypt/v2 v2.2.7
+	github.com/elazarl/goproxy v0.0.0-20230731152917-f99041a5c027
 	github.com/eycorsican/go-tun2socks v0.0.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/miekg/dns v1.1.55

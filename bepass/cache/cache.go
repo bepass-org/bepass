@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -29,7 +30,7 @@ func NewCache(duration time.Duration) *Cache {
 func (c *Cache) Set(key string, value interface{}, durations ...time.Duration) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
+	fmt.Println(fmt.Sprintf("Caching: %s: %v", key, value))
 	var duration time.Duration
 	if len(durations) > 0 {
 		duration = durations[0]

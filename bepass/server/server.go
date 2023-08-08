@@ -74,7 +74,7 @@ func (s *Server) getHostnameRegex(data []byte) ([]byte, error) {
 
 	var sni string
 	var prev byte
-	for i := 0; i < len(data); i++ {
+	for i := 0; i < len(data)-1; i++ {
 		if prev == 0 && data[i] == 0 {
 			start := i + 2
 			end := start + int(data[i+1])
@@ -91,14 +91,21 @@ func (s *Server) getHostnameRegex(data []byte) ([]byte, error) {
 	return []byte(sni), nil
 }
 
-// getHostname /* This function is basically all most folks want to invoke out of this
+// getHostname This function is basically all most folks want to invoke out of this
 func (s *Server) getHostname(data []byte) ([]byte, error) {
 	extensions, err := s.getExtensionBlock(data)
+	shouldUseNewRegexMethod := !s.WorkerConfig.WorkerEnabled || (s.WorkerConfig.WorkerEnabled && s.WorkerConfig.WorkerDNSOnly)
 	if err != nil {
+		if shouldUseNewRegexMethod {
+			return s.getHostnameRegex(data)
+		}
 		return nil, err
 	}
 	sn, err := s.getSNBlock(extensions)
 	if err != nil {
+		if shouldUseNewRegexMethod {
+			return s.getHostnameRegex(data)
+		}
 		return nil, err
 	}
 	sni, err := s.getSNIBlock(sn)
@@ -459,7 +466,12 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 	s.Logger.Printf("resolved %s to %s", fqdn, answer.String())
 	record := strings.Fields(answer.String())
 	if record[3] == "CNAME" {
-		return s.Resolve(record[4])
+		ip, err := s.Resolve(record[4])
+		if err != nil {
+			return "", err
+		}
+		s.Cache.Set(fqdn, ip)
+		return ip, nil
 	}
 	ip := record[4]
 	s.Cache.Set(fqdn, ip)

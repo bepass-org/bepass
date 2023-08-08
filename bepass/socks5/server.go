@@ -6,14 +6,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/net/proxy"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 
-	"bepass/socks5/statute"
-
 	"bepass/logger"
+	"bepass/socks5/statute"
+	"github.com/elazarl/goproxy"
 )
 
 // GPool is used to implement custom goroutine pool default use goroutine
@@ -59,6 +61,7 @@ type Server struct {
 	userAssociateHandle func(ctx context.Context, writer io.Writer, request *Request) error
 	done                chan bool
 	listen              net.Listener
+	httpProxyBindAddr   string
 }
 
 // NewServer creates a new Server
@@ -93,12 +96,46 @@ func NewServer(opts ...Option) *Server {
 
 // ListenAndServe is used to create a listener and serve on it
 func (sf *Server) ListenAndServe(network, addr string) error {
-	l, err := net.Listen(network, addr)
-	sf.listen = l
+	prx := goproxy.NewProxyHttpServer()
+	prx.Verbose = true
+
+	dialer, err := proxy.SOCKS5(network, addr, nil, proxy.Direct)
+
 	if err != nil {
 		return err
 	}
-	return sf.Serve()
+
+	prx.Tr.Dial = dialer.Dial
+
+	// find a random port and listen to it
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return err
+	}
+
+	sf.httpProxyBindAddr = listener.Addr().String()
+
+	errorChan := make(chan error)
+
+	go func() {
+		err := http.Serve(listener, prx)
+		if err != nil {
+			errorChan <- err
+			return
+		}
+	}()
+
+	go func() {
+		l, err := net.Listen(network, addr)
+		sf.listen = l
+		if err != nil {
+			errorChan <- err
+			return
+		}
+		errorChan <- sf.Serve()
+	}()
+
+	return <-errorChan
 }
 
 // Serve is used to serve internet from a listener
@@ -134,18 +171,52 @@ func (sf *Server) Shutdown() error {
 
 // ServeConn is used to serve a single connection.
 func (sf *Server) ServeConn(conn net.Conn) error {
-	var authContext *AuthContext
-
 	defer conn.Close()
 
 	bufConn := bufio.NewReader(conn)
 
-	mr, err := statute.ParseMethodRequest(bufConn)
+	b, err := bufConn.Peek(1)
 	if err != nil {
 		return err
 	}
-	if mr.Ver != statute.VersionSocks5 {
-		return statute.ErrNotSupportVersion
+
+	switch b[0] {
+	case statute.VersionSocks5:
+		return sf.handleSocksRequest(conn, bufConn)
+	default:
+		return sf.handleHTTPRequest(conn, bufConn)
+	}
+}
+
+func (sf *Server) handleHTTPRequest(conn net.Conn, bufConn *bufio.Reader) error {
+	dstConn, err := net.Dial(sf.listen.Addr().Network(), sf.httpProxyBindAddr)
+	defer dstConn.Close()
+	if err != nil {
+		return err
+	}
+	errChan := make(chan error)
+	go func() {
+		_, err := io.Copy(dstConn, bufConn)
+		if err != nil {
+			errChan <- err
+		}
+	}()
+	go func() {
+		_, err := io.Copy(conn, dstConn)
+		if err != nil {
+			errChan <- err
+		}
+	}()
+
+	return <-errChan
+}
+
+func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error {
+	var authContext *AuthContext
+
+	mr, err := statute.ParseMethodRequest(bufConn)
+	if err != nil {
+		return err
 	}
 
 	// Authenticate the connection
