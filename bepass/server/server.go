@@ -4,6 +4,7 @@ import (
 	"bepass/cache"
 	"bepass/doh"
 	"bepass/logger"
+	"bepass/protect"
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bepass/transport"
@@ -15,6 +16,8 @@ import (
 	"math/rand"
 	"net"
 	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,14 +42,15 @@ type WorkerConfig struct {
 }
 
 type Server struct {
-	RemoteDNSAddr string
-	Cache         *cache.Cache
-	ResolveSystem string
-	DoHClient     *doh.Client
-	ChunkConfig   ChunkConfig
-	WorkerConfig  WorkerConfig
-	Logger        *logger.Std
-	BindAddress   string
+	RemoteDNSAddr         string
+	Cache                 *cache.Cache
+	ResolveSystem         string
+	DoHClient             *doh.Client
+	ChunkConfig           ChunkConfig
+	WorkerConfig          WorkerConfig
+	Logger                *logger.Std
+	BindAddress           string
+	EnableLowLevelSockets bool
 }
 
 var sniRegex = regexp.MustCompile(`^(?:[a-z0-9-]+\.)+[a-z]+$`)
@@ -391,6 +395,14 @@ func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (*
 
 // connectToDestination connects to the destination address.
 func (s *Server) connectToDestination(addr *net.TCPAddr) (*net.TCPConn, error) {
+	if s.EnableLowLevelSockets && (runtime.GOOS == "android" || runtime.GOOS == "linux") {
+		dialer := protect.NewClientDialer()
+		conn, err := dialer.Dial("tcp", net.JoinHostPort(addr.IP.String(), strconv.Itoa(addr.Port)))
+		if err != nil {
+			return nil, err
+		}
+		return conn.(*net.TCPConn), nil
+	}
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		s.Logger.Errorf("failed to connect to %s: %v", addr, err)

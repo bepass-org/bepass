@@ -22,6 +22,7 @@ type Config struct {
 	WorkerIPPortAddress   string      `mapstructure:"WorkerIPPortAddress"`
 	WorkerEnabled         bool        `mapstructure:"WorkerEnabled"`
 	WorkerDNSOnly         bool        `mapstructure:"WorkerDNSOnly"`
+	EnableLowLevelSockets bool        `mapstructure:"EnableLowLevelSockets"`
 	RemoteDNSAddr         string      `mapstructure:"RemoteDNSAddr"`
 	BindAddress           string      `mapstructure:"BindAddress"`
 	ChunksLengthBeforeSni [2]int      `mapstructure:"ChunksLengthBeforeSni"`
@@ -67,14 +68,15 @@ func RunServer(config *Config, captureCTRLC bool) error {
 	}
 
 	serverHandler := &server.Server{
-		RemoteDNSAddr: config.RemoteDNSAddr,
-		Cache:         appCache,
-		ResolveSystem: resolveSystem,
-		DoHClient:     dohClient,
-		Logger:        appLogger,
-		ChunkConfig:   chunkConfig,
-		WorkerConfig:  workerConfig,
-		BindAddress:   config.BindAddress,
+		RemoteDNSAddr:         config.RemoteDNSAddr,
+		Cache:                 appCache,
+		ResolveSystem:         resolveSystem,
+		DoHClient:             dohClient,
+		Logger:                appLogger,
+		ChunkConfig:           chunkConfig,
+		WorkerConfig:          workerConfig,
+		BindAddress:           config.BindAddress,
+		EnableLowLevelSockets: config.EnableLowLevelSockets,
 	}
 
 	if captureCTRLC {
