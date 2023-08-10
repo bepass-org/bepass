@@ -2,50 +2,59 @@ package main
 
 import (
 	"bepass/cmd/core"
-	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
+	"log"
 )
 
-func loadConfig() (*core.Config, error) {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
-	}
+var configPath string
 
-	var config core.Config
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, err
+func loadConfig() {
+	if configPath != "" {
+		viper.SetConfigFile(configPath)
+	} else {
+		viper.SetConfigName("config")
+		viper.AddConfigPath(".")
+		viper.SetConfigType("json")
 	}
+	viper.AutomaticEnv()
 
-	return &config, nil
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func init() {
+	cobra.OnInitialize(loadConfig)
 }
 
 func main() {
-	var configPath string
-
-	config, err := loadConfig()
-	if err != nil {
-		panic(err)
-	}
-
 	rootCmd := &cobra.Command{
-		Use:   "cli",
-		Short: "cli is a socks5 proxy server",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return core.RunServer(config, true)
+		Use:   "Bepass",
+		Short: "Bepass is an Anti DPI and anti censorship proxy solution",
+		Run: func(cmd *cobra.Command, args []string) {
+			config := &core.Config{}
+			err := viper.Unmarshal(&config)
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = core.RunServer(config, true)
+			if err != nil {
+				log.Fatal(err)
+			}
 		},
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "./config.json", "Path to configuration file")
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	viper.SetEnvPrefix("cli")
-	viper.AutomaticEnv()
+	err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	viper.SetEnvPrefix("Bepass")
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	err = rootCmd.Execute()
+	if err != nil {
+		log.Fatal(err)
 	}
 }

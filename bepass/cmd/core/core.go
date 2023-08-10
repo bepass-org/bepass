@@ -56,6 +56,7 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		BeforeSniLength: config.SniChunksLength,
 		AfterSniLength:  config.ChunksLengthAfterSni,
 		Delay:           config.DelayBetweenChunks,
+		TLSHeaderLength: config.TLSHeaderLength,
 	}
 
 	workerConfig := server.WorkerConfig{

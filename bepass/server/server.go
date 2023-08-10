@@ -24,6 +24,7 @@ import (
 
 // ChunkConfig Constants for chunk lengths and delays.
 type ChunkConfig struct {
+	TLSHeaderLength int
 	BeforeSniLength [2]int
 	AfterSniLength  [2]int
 	Delay           [2]int
@@ -177,7 +178,7 @@ func (s *Server) getSNBlock(data []byte) ([]byte, error) {
 // getExtensionBlock finds the extension block given a raw TLS Client Hello.
 func (s *Server) getExtensionBlock(data []byte) ([]byte, error) {
 	dataLen := len(data)
-	index := 5 + 38
+	index := s.ChunkConfig.TLSHeaderLength + 38
 
 	if dataLen <= index+1 {
 		return nil, fmt.Errorf("not enough bits to be a Client Hello")
