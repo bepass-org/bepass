@@ -2,9 +2,10 @@ package server
 
 import (
 	"bepass/cache"
+	"bepass/dialer"
 	"bepass/doh"
 	"bepass/logger"
-	"bepass/protect"
+	"bepass/resolve"
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bepass/transport"
@@ -15,8 +16,8 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"net/url"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,8 +50,10 @@ type Server struct {
 	ChunkConfig           ChunkConfig
 	WorkerConfig          WorkerConfig
 	Logger                *logger.Std
+	Dialer                *dialer.Dialer
 	BindAddress           string
 	EnableLowLevelSockets bool
+	LocalResolver         *resolve.LocalResolver
 }
 
 var sniRegex = regexp.MustCompile(`^(?:[a-z0-9-]+\.)+[a-z]+$`)
@@ -266,6 +269,7 @@ func (s *Server) getCompressionLength(data []byte, index int) (int, int, error) 
 
 	return compressionLength, newIndex, nil
 }
+
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 	chunks := make(map[int][]byte)
 	hostname, err := s.getHostname(data)
@@ -334,10 +338,10 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) e
 			return err
 		}
 		// , s.WorkerConfig.WorkerIPPortAddress
-		return transport.TunnelToWorkerThroughWs(ctx, w, req, s.WorkerConfig.WorkerAddress, s.BindAddress, s.Logger)
+		return transport.TunnelToWorkerThroughWs(ctx, w, req, s.WorkerConfig.WorkerAddress, s.BindAddress, s.Logger, s.Dialer)
 	}
 
-	dest, err := s.resolveDestination(ctx, req)
+	IPPort, err := s.resolveDestination(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -347,7 +351,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) e
 		return err
 	}
 
-	conn, err := s.connectToDestination(dest)
+	conn, err := s.Dialer.TCPDial("tcp", "", IPPort)
 	if err != nil {
 		return err
 	}
@@ -374,13 +378,13 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) e
 }
 
 // resolveDestination resolves the destination address using DNS.
-func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (*net.TCPAddr, error) {
+func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (string, error) {
 	dest := req.RawDestAddr
 
 	if dest.FQDN != "" {
 		ip, err := s.Resolve(dest.FQDN)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		dest.IP = net.ParseIP(ip)
 		s.Logger.Printf("resolved %s to %s", req.RawDestAddr, dest)
@@ -388,27 +392,9 @@ func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (*
 		s.Logger.Printf("skipping resolution for %s", req.RawDestAddr)
 	}
 
-	addr := &net.TCPAddr{IP: dest.IP, Port: dest.Port}
+	addr := net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
 	s.Logger.Printf("dialing %s", addr)
 	return addr, nil
-}
-
-// connectToDestination connects to the destination address.
-func (s *Server) connectToDestination(addr *net.TCPAddr) (*net.TCPConn, error) {
-	if s.EnableLowLevelSockets && (runtime.GOOS == "android" || runtime.GOOS == "linux") {
-		dialer := protect.NewClientDialer()
-		conn, err := dialer.Dial("tcp", net.JoinHostPort(addr.IP.String(), strconv.Itoa(addr.Port)))
-		if err != nil {
-			return nil, err
-		}
-		return conn.(*net.TCPConn), nil
-	}
-	conn, err := net.DialTCP("tcp", nil, addr)
-	if err != nil {
-		s.Logger.Errorf("failed to connect to %s: %v", addr, err)
-		return nil, err
-	}
-	return conn, nil
 }
 
 // sendChunks sends chunks from bepass to dst
@@ -439,6 +425,19 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 	if s.WorkerConfig.WorkerEnabled &&
 		strings.Contains(s.WorkerConfig.WorkerAddress, fqdn) {
 		return strings.Split(s.WorkerConfig.WorkerIPPortAddress, ":")[0], nil
+	}
+
+	if h := s.LocalResolver.CheckHosts(fqdn); h != "" {
+		return h, nil
+	}
+
+	if s.ResolveSystem == "doh" {
+		u, err := url.Parse(s.RemoteDNSAddr)
+		if err == nil {
+			if u.Hostname() == fqdn {
+				return s.LocalResolver.Resolve(u.Hostname()), nil
+			}
+		}
 	}
 
 	// Ensure fqdn ends with a period
@@ -493,14 +492,12 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 
 // resolveDNSWithDOH resolves DNS using DNS-over-HTTP (DoH) client.
 func (s *Server) resolveDNSWithDOH(req *dns.Msg) (*dns.Msg, error) {
-	needsFragmentation := false
 	dnsAddr := s.RemoteDNSAddr
 	if s.WorkerConfig.WorkerEnabled && s.WorkerConfig.WorkerDNSOnly {
-		needsFragmentation = true
 		dnsAddr = s.WorkerConfig.WorkerAddress
 	}
 
-	exchange, _, err := s.DoHClient.Exchange(req, dnsAddr, needsFragmentation)
+	exchange, _, err := s.DoHClient.Exchange(req, dnsAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +509,9 @@ func (s *Server) resolveDNSWithDOH(req *dns.Msg) (*dns.Msg, error) {
 
 // resolveDNSWithDNSCrypt resolves DNS using DNSCrypt client.
 func (s *Server) resolveDNSWithDNSCrypt(req *dns.Msg) (*dns.Msg, error) {
-	c := dnscrypt.Client{Net: "tcp", Timeout: 10 * time.Second}
+	c := dnscrypt.Client{
+		Net: "tcp", Timeout: 10 * time.Second,
+	}
 	resolverInfo, err := c.Dial(s.RemoteDNSAddr)
 	if err != nil {
 		return nil, err

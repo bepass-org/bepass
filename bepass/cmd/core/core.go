@@ -2,8 +2,10 @@ package core
 
 import (
 	"bepass/cache"
+	"bepass/dialer"
 	"bepass/doh"
 	"bepass/logger"
+	"bepass/resolve"
 	"bepass/server"
 	"bepass/socks5"
 	"fmt"
@@ -16,21 +18,26 @@ import (
 )
 
 type Config struct {
-	TLSHeaderLength       int         `mapstructure:"TLSHeaderLength"`
-	DnsCacheTTL           int         `mapstructure:"DnsCacheTTL"`
-	WorkerAddress         string      `mapstructure:"WorkerAddress"`
-	WorkerIPPortAddress   string      `mapstructure:"WorkerIPPortAddress"`
-	WorkerEnabled         bool        `mapstructure:"WorkerEnabled"`
-	WorkerDNSOnly         bool        `mapstructure:"WorkerDNSOnly"`
-	EnableLowLevelSockets bool        `mapstructure:"EnableLowLevelSockets"`
-	RemoteDNSAddr         string      `mapstructure:"RemoteDNSAddr"`
-	BindAddress           string      `mapstructure:"BindAddress"`
-	ChunksLengthBeforeSni [2]int      `mapstructure:"ChunksLengthBeforeSni"`
-	SniChunksLength       [2]int      `mapstructure:"SniChunksLength"`
-	ChunksLengthAfterSni  [2]int      `mapstructure:"ChunksLengthAfterSni"`
-	DelayBetweenChunks    [2]int      `mapstructure:"DelayBetweenChunks"`
-	ResolveSystem         string      `mapstructure:"-"`
-	DoHClient             *doh.Client `mapstructure:"-"`
+	TLSHeaderLength        int             `mapstructure:"TLSHeaderLength"`
+	TLSPaddingEnabled      bool            `mapstructure:"TLSPaddingEnabled"`
+	TLSPaddingSize         [2]int          `mapstructure:"TLSPaddingSize"`
+	DnsCacheTTL            int             `mapstructure:"DnsCacheTTL"`
+	DnsRequestTimeout      int             `mapstructure:"DnsRequestTimeout"`
+	WorkerAddress          string          `mapstructure:"WorkerAddress"`
+	WorkerIPPortAddress    string          `mapstructure:"WorkerIPPortAddress"`
+	WorkerEnabled          bool            `mapstructure:"WorkerEnabled"`
+	WorkerDNSOnly          bool            `mapstructure:"WorkerDNSOnly"`
+	EnableLowLevelSockets  bool            `mapstructure:"EnableLowLevelSockets"`
+	EnableDNSFragmentation bool            `mapstructure:"EnableDNSFragmentation"`
+	RemoteDNSAddr          string          `mapstructure:"RemoteDNSAddr"`
+	BindAddress            string          `mapstructure:"BindAddress"`
+	ChunksLengthBeforeSni  [2]int          `mapstructure:"ChunksLengthBeforeSni"`
+	SniChunksLength        [2]int          `mapstructure:"SniChunksLength"`
+	ChunksLengthAfterSni   [2]int          `mapstructure:"ChunksLengthAfterSni"`
+	DelayBetweenChunks     [2]int          `mapstructure:"DelayBetweenChunks"`
+	Hosts                  []resolve.Hosts `mapstructure:"Hosts"`
+	ResolveSystem          string          `mapstructure:"-"`
+	DoHClient              *doh.Client     `mapstructure:"-"`
 }
 
 var s5 *socks5.Server
@@ -41,18 +48,33 @@ func RunServer(config *Config, captureCTRLC bool) error {
 	var resolveSystem string
 	var dohClient *doh.Client
 
+	stdLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	appLogger := logger.NewLogger(stdLogger)
+
+	localResolver := &resolve.LocalResolver{
+		Logger: appLogger,
+		Hosts:  config.Hosts,
+	}
+
+	dialer_ := &dialer.Dialer{
+		Logger:                appLogger,
+		EnableLowLevelSockets: config.EnableLowLevelSockets,
+		TLSPaddingEnabled:     config.TLSPaddingEnabled,
+		TLSPaddingSize:        config.TLSPaddingSize,
+		ProxyAddress:          fmt.Sprintf("socks5://%s", config.BindAddress),
+	}
+
 	if strings.HasPrefix(config.RemoteDNSAddr, "https://") {
 		resolveSystem = "doh"
 		dohClient = doh.NewClient(
-			doh.WithTimeout(10*time.Second),
-			doh.WithSocks5(fmt.Sprintf("socks5://%s", config.BindAddress)),
+			doh.WithDNSFragmentation((config.WorkerEnabled && config.WorkerDNSOnly) || config.EnableDNSFragmentation),
+			doh.WithDialer(dialer_),
+			doh.WithLocalResolver(localResolver),
 		)
 	} else {
 		resolveSystem = "DNSCrypt"
 	}
 
-	stdLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
-	appLogger := logger.NewLogger(stdLogger)
 	chunkConfig := server.ChunkConfig{
 		BeforeSniLength: config.SniChunksLength,
 		AfterSniLength:  config.ChunksLengthAfterSni,
@@ -77,6 +99,8 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		WorkerConfig:          workerConfig,
 		BindAddress:           config.BindAddress,
 		EnableLowLevelSockets: config.EnableLowLevelSockets,
+		Dialer:                dialer_,
+		LocalResolver:         localResolver,
 	}
 
 	if captureCTRLC {
@@ -93,7 +117,7 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		socks5.WithConnectHandle(serverHandler.Handle),
 	)
 
-	fmt.Println("Starting socks server:", config.BindAddress)
+	fmt.Println("Starting socks, http server:", config.BindAddress)
 	if err := s5.ListenAndServe("tcp", config.BindAddress); err != nil {
 		return err
 	}

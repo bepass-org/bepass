@@ -1,6 +1,8 @@
 package doh
 
 import (
+	"bepass/dialer"
+	"bepass/resolve"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -12,22 +14,30 @@ import (
 )
 
 type ClientOptions struct {
-	Timeout           time.Duration // Timeout for one DNS query
-	Socks5BindAddress string
+	EnableDNSFragment bool
+	Dialer            *dialer.Dialer
+	LocalResolver     *resolve.LocalResolver
 }
 
 type ClientOption func(*ClientOptions) error
 
-func WithTimeout(t time.Duration) ClientOption {
+func WithDialer(b *dialer.Dialer) ClientOption {
 	return func(o *ClientOptions) error {
-		o.Timeout = t
+		o.Dialer = b
 		return nil
 	}
 }
 
-func WithSocks5(b string) ClientOption {
+func WithDNSFragmentation(f bool) ClientOption {
 	return func(o *ClientOptions) error {
-		o.Socks5BindAddress = b
+		o.EnableDNSFragment = f
+		return nil
+	}
+}
+
+func WithLocalResolver(r *resolve.LocalResolver) ClientOption {
+	return func(o *ClientOptions) error {
+		o.LocalResolver = r
 		return nil
 	}
 }
@@ -37,7 +47,7 @@ type Client struct {
 }
 
 func NewClient(opts ...ClientOption) *Client {
-	o := &ClientOptions{Timeout: 5 * time.Second} // Default timeout of 5 seconds
+	o := &ClientOptions{}
 	for _, f := range opts {
 		f(o)
 	}
@@ -46,24 +56,18 @@ func NewClient(opts ...ClientOption) *Client {
 	}
 }
 
-func (c *Client) HTTPClient(address string, needsFragmentation bool) ([]byte, error) {
-	transport := &http.Transport{}
-
-	if needsFragmentation {
-		// if its worker utl it should go through internal socks 5 server inorder to get chunked
-		// SOCKS5 proxy URL with remote DNS
-		//fmt.Print(c.opt.Socks5BindAddress)
-		proxyUrl, _ := url.Parse(c.opt.Socks5BindAddress)
-
-		// Create dialer
-		transport.Proxy = http.ProxyURL(proxyUrl)
+func (c *Client) HTTPClient(address string) ([]byte, error) {
+	var client *http.Client
+	if c.opt.EnableDNSFragment {
+		client = c.opt.Dialer.MakeHTTPClient("", true)
+	} else {
+		u, err := url.Parse(address)
+		if err != nil {
+			return nil, err
+		}
+		dohIP := c.opt.LocalResolver.Resolve(u.Hostname())
+		client = c.opt.Dialer.MakeHTTPClient(dohIP+":443", false)
 	}
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   c.opt.Timeout,
-	}
-
 	resp, err := client.Get(address)
 	if err != nil {
 		return nil, err
@@ -82,7 +86,7 @@ func (c *Client) HTTPClient(address string, needsFragmentation bool) ([]byte, er
 	return content, nil
 }
 
-func (c *Client) Exchange(req *dns.Msg, address string, needsFragmentation bool) (r *dns.Msg, rtt time.Duration, err error) {
+func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Duration, err error) {
 	var (
 		buf, b64 []byte
 		begin    = time.Now()
@@ -98,7 +102,7 @@ func (c *Client) Exchange(req *dns.Msg, address string, needsFragmentation bool)
 	b64 = make([]byte, base64.RawURLEncoding.EncodedLen(len(buf)))
 	base64.RawURLEncoding.Encode(b64, buf)
 
-	content, err := c.HTTPClient(address+"?dns="+string(b64), needsFragmentation)
+	content, err := c.HTTPClient(address + "?dns=" + string(b64))
 	if err != nil {
 		return
 	}

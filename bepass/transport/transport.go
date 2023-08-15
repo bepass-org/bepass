@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bepass/dialer"
 	"bepass/logger"
 	"bepass/socks5"
 	"bepass/socks5/statute"
@@ -8,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/websocket"
-	tls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 	"io"
 	"net"
@@ -17,53 +17,38 @@ import (
 )
 
 func socks5TCPDial(ctx context.Context, network, addr, socks5BindAddress string) (net.Conn, error) {
-	dialer, err := proxy.SOCKS5("tcp", socks5BindAddress, nil, proxy.Direct)
+	d, err := proxy.SOCKS5("tcp", socks5BindAddress, nil, proxy.Direct)
 	if err != nil {
 		return nil, err
 	}
-	return dialer.Dial(network, addr)
+	return d.Dial(network, addr)
 }
 
-func wsDialer(workerAddress, socks5BindAddress string) (*websocket.Conn, error) {
-	dialer := websocket.Dialer{
+func wsDialer(workerAddress, socks5BindAddress string, dialer *dialer.Dialer) (*websocket.Conn, error) {
+	d := websocket.Dialer{
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return socks5TCPDial(ctx, network, addr, socks5BindAddress)
 		},
 
 		NetDialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			plainConn, err := socks5TCPDial(ctx, network, addr, socks5BindAddress)
-			if err != nil {
-				return nil, err
-			}
-			config := tls.Config{
-				ServerName:         strings.Split(addr, ":")[0],
-				InsecureSkipVerify: true,
-				NextProtos:         []string{"http/1.1"},
-				MinVersion:         tls.VersionTLS10,
-			}
-			utlsConn := tls.UClient(plainConn, &config, tls.HelloAndroid_11_OkHttp)
-			err = utlsConn.Handshake()
-			if err != nil {
-				_ = plainConn.Close()
-				fmt.Println(err)
-				return nil, err
-			}
-			return utlsConn, nil
+			return dialer.TLSDial(func(network, addr, hostPort string) (net.Conn, error) {
+				return socks5TCPDial(ctx, network, addr, socks5BindAddress)
+			}, network, addr, "")
 		},
 	}
 
-	conn, _, err := dialer.Dial(workerAddress, nil)
+	conn, _, err := d.Dial(workerAddress, nil)
 	return conn, err
 }
 
-func TunnelToWorkerThroughWs(ctx context.Context, w io.Writer, req *socks5.Request, workerAddress, socks5BindAddress string, logger *logger.Std) error {
+func TunnelToWorkerThroughWs(ctx context.Context, w io.Writer, req *socks5.Request, workerAddress, socks5BindAddress string, logger *logger.Std, dialer *dialer.Dialer) error {
 	// connect to remote server via ws
 	u, err := url.Parse(workerAddress)
 	if err != nil {
 		return err
 	}
 	endpoint := fmt.Sprintf("wss://%s/connect?host=%s&port=%s", u.Host, strings.Split(req.DstAddr.String(), ":")[0], strings.Split(req.DstAddr.String(), ":")[1])
-	wsConn, err := wsDialer(endpoint, socks5BindAddress)
+	wsConn, err := wsDialer(endpoint, socks5BindAddress, dialer)
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err

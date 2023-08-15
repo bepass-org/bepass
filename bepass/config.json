@@ -1,7 +1,11 @@
 {
   "TLSHeaderLength": 5,
+  "TLSPaddingEnabled": false,
+  "TLSPaddingSize": [10, 50],
   "RemoteDNSAddr": "https://yarp.lefolgoc.net/dns-query",
+  "EnableDNSFragmentation": true,
   "DnsCacheTTL": 30,
+  "DnsRequestTimeout": 10,
   "BindAddress": "0.0.0.0:8085",
   "ChunksLengthBeforeSni": [1, 5],
   "SniChunksLength": [1, 5],
@@ -11,5 +15,11 @@
   "WorkerIPPortAddress": "104.31.16.104:443",
   "WorkerEnabled": true,
   "WorkerDNSOnly": false,
-  "EnableLowLevelSockets": false
+  "EnableLowLevelSockets": false,
+  "Hosts": [
+    {
+      "Domain": "yarp.lefolgoc.net",
+      "IP": "5.39.88.20"
+    }
+  ]
 }
