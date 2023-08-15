@@ -22,11 +22,11 @@ release: create_dirs
 
 gui: create_dirs
 	@echo "Building GUI version..."
-	go build $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
+	go build -o $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
 
 gui-release: create_dirs
 	@echo "Building GUI Release Version..."
-	go build $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
+	go build -ldflags '-s -w' -o $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
 
 test: build
 	@echo "Running tests..."
