@@ -14,19 +14,19 @@ clean:
 
 build: create_dirs
 	@echo "Building Cli Version..."
-	go build -o $(BUILD_DIR)/bepass cmd/cli/main.go
+	CGO_ENABLED=0 go build -trimpath -o $(BUILD_DIR)/bepass cmd/cli/main.go
 
 release: create_dirs
 	@echo "Building Cli Release Version..."
-	go build -ldflags '-s -w' -o $(BUILD_DIR)/bepass cmd/cli/main.go
+	CGO_ENABLED=0 go build -ldflags '-s -w' -trimpath -o $(BUILD_DIR)/bepass cmd/cli/main.go
 
 gui: create_dirs
 	@echo "Building GUI version..."
-	go build -o $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
+	go build -trimpath -o $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
 
 gui-release: create_dirs
 	@echo "Building GUI Release Version..."
-	go build -ldflags '-s -w' -o $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
+	go build -ldflags '-s -w' -trimpath -o $(BUILD_DIR)/bepass-gui cmd/gui/gui.go
 
 test: build
 	@echo "Running tests..."
