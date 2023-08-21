@@ -133,35 +133,33 @@ jobs:
       
       - name: Build Bepass
         run: |
-          cd bepass
           mkdir -p build_assets
           go build -v -o build_assets/bepass -trimpath -ldflags "-s -w -buildid=" ./cmd/cli
     
       - name: Build Mips softfloat Bepass
         if: matrix.goarch == 'mips' || matrix.goarch == 'mipsle'
         run: |
-          cd bepass
           GOMIPS=softfloat go build -v -o build_assets/bepass_softfloat -trimpath -ldflags "-s -w -buildid=" ./cmd/cli
 
       - name: Rename Windows Bepass
         if: matrix.goos == 'windows'
         run: |
-          cd ./bepass/build_assets || exit 1
+          cd ./build_assets || exit 1
           mv bepass bepass.exe
 
       - name: Copy README.md & LICENSE
         run: |
-          cp ${GITHUB_WORKSPACE}/README.md ./bepass/build_assets/README.md
-          cp ${GITHUB_WORKSPACE}/LICENSE ./bepass/build_assets/LICENSE
+          cp ${GITHUB_WORKSPACE}/README.md ./build_assets/README.md
+          cp ${GITHUB_WORKSPACE}/LICENSE ./build_assets/LICENSE
 
       - name: Create ZIP archive
         shell: bash
         run: |
-          pushd ./bepass/build_assets || exit 1
+          pushd ./build_assets || exit 1
           touch -mt $(date +%Y01010000) *
           zip -9vr ../Bepass-${{ env.ASSET_NAME }}.zip .
           popd || exit 1
-          FILE=./bepass/Bepass-${{ env.ASSET_NAME }}.zip
+          FILE=./Bepass-${{ env.ASSET_NAME }}.zip
           DGST=$FILE.dgst
           for METHOD in {"md5","sha1","sha256","sha512"}
           do
@@ -170,20 +168,20 @@ jobs:
 
       - name: Change the name
         run: |
-          mv ./bepass/build_assets ./bepass/Bepass-${{ env.ASSET_NAME }}
+          mv ./build_assets ./Bepass-${{ env.ASSET_NAME }}
 
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: Bepass-${{ env.ASSET_NAME }}
           path: |
-            ./bepass/Bepass-${{ env.ASSET_NAME }}/*
+            ./Bepass-${{ env.ASSET_NAME }}/*
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./bepass/Bepass-${{ env.ASSET_NAME }}.zip*
+          file: ./Bepass-${{ env.ASSET_NAME }}.zip*
           tag: ${{ github.ref }}
           file_glob: true
