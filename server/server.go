@@ -424,7 +424,15 @@ func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool, wg *
 func (s *Server) Resolve(fqdn string) (string, error) {
 	if s.WorkerConfig.WorkerEnabled &&
 		strings.Contains(s.WorkerConfig.WorkerAddress, fqdn) {
-		return strings.Split(s.WorkerConfig.WorkerIPPortAddress, ":")[0], nil
+		dh, _, err := net.SplitHostPort(s.WorkerConfig.WorkerIPPortAddress)
+		if strings.Contains(dh, ":") {
+			// its ipv6
+			dh = "[" + dh + "]"
+		}
+		if err != nil {
+			return "", err
+		}
+		return dh, nil
 	}
 
 	if h := s.LocalResolver.CheckHosts(fqdn); h != "" {

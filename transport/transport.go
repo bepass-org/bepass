@@ -47,8 +47,18 @@ func TunnelToWorkerThroughWs(ctx context.Context, w io.Writer, req *socks5.Reque
 	if err != nil {
 		return err
 	}
-	dp := req.DstAddr.String()[strings.LastIndex(req.DstAddr.String(), ":")+1:]
-	dh := req.DstAddr.String()[:strings.LastIndex(req.DstAddr.String(), ":")]
+	dh, dp, err := net.SplitHostPort(req.DstAddr.String())
+	if strings.Contains(dh, ":") {
+		// its ipv6
+		dh = "[" + dh + "]"
+	}
+	if err != nil {
+		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
+			return err
+		}
+		logger.Printf("Could not split host and port: %v\n", err)
+		return err
+	}
 	endpoint := fmt.Sprintf("wss://%s/connect?host=%s&port=%s", u.Host, dh, dp)
 	wsConn, err := wsDialer(endpoint, socks5BindAddress, dialer)
 	if err != nil {

@@ -167,7 +167,10 @@ func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.C
 }
 
 func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort string) (net.Conn, error) {
-	sni := strings.Split(addr, ":")[0]
+	sni, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
 	plainConn, err := plainDialer(network, addr, hostPort)
 	if err != nil {
 		return nil, err
