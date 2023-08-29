@@ -22,7 +22,7 @@ type UdpBind struct {
 	SocksWriter   io.Writer
 	SocksReq      *socks5.Request
 	AssociateBind *net.UDPConn
-	RecvChan      chan *UDPPacket
+	RecvChan      chan UDPPacket
 }
 
 type UDPConf struct {
@@ -132,7 +132,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 		return err
 	}
 
-	bindWriteChannel := make(chan *UDPPacket)
+	bindWriteChannel := make(chan UDPPacket)
 	tunnelWriteChannel, channelIndex, err := t.Tunnel.PersistentDial(tunnelEndpoint, bindWriteChannel)
 	if err != nil {
 		t.Logger.Errorf("Unable to get or create tunnel for udpBindWriteChannel %v\r\n", err)
@@ -165,7 +165,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 			if err != nil {
 				continue
 			}
-			tunnelWriteChannel <- &UDPPacket{
+			tunnelWriteChannel <- UDPPacket{
 				Channel: channelIndex,
 				Data:    pk.Data,
 			}
@@ -173,7 +173,6 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 	}()
 	for {
 		datagram := <-udpBind.RecvChan
-		fmt.Print("injam")
 		pkb, err := statute.NewDatagram(req.RawDestAddr.String(), datagram.Data)
 		if err != nil {
 			continue

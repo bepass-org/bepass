@@ -6,7 +6,6 @@ import (
 	"bepass/wsconnadapter"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/proxy"
 	"net"
@@ -15,8 +14,8 @@ import (
 )
 
 type EstablishedTunnel struct {
-	tunnelWriteChannel chan *UDPPacket
-	bindWriteChannels  map[uint16]chan *UDPPacket
+	tunnelWriteChannel chan UDPPacket
+	bindWriteChannels  map[uint16]chan UDPPacket
 	channelIndex       uint16
 }
 
@@ -56,18 +55,18 @@ func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	return conn, err
 }
 
-func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan *UDPPacket) (chan *UDPPacket, uint16, error) {
+func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan UDPPacket) (chan UDPPacket, uint16, error) {
 	if tunnel, ok := w.EstablishedTunnels[tunnelEndpoint]; ok {
 		tunnel.channelIndex = tunnel.channelIndex + 1
 		tunnel.bindWriteChannels[tunnel.channelIndex] = bindWriteChannel
 		return tunnel.tunnelWriteChannel, tunnel.channelIndex, nil
 	}
 
-	tunnelWriteChannel := make(chan *UDPPacket)
+	tunnelWriteChannel := make(chan UDPPacket)
 
 	w.EstablishedTunnels[tunnelEndpoint] = &EstablishedTunnel{
 		tunnelWriteChannel: tunnelWriteChannel,
-		bindWriteChannels:  make(map[uint16]chan *UDPPacket),
+		bindWriteChannels:  make(map[uint16]chan UDPPacket),
 		channelIndex:       1,
 	}
 
@@ -162,15 +161,10 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan *
 							continue
 						}
 
-						fmt.Println(rawPacket[:n])
-
 						// first 2 packets of response is channel id
-
 						channelID := binary.BigEndian.Uint16(rawPacket[:2])
 
-						fmt.Println(channelID)
-
-						pkt := &UDPPacket{
+						pkt := UDPPacket{
 							channelID,
 							rawPacket[2:n],
 						}
