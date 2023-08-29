@@ -108,7 +108,7 @@ func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
 }
 
 func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
-	udpAddr, err := net.ResolveUDPAddr("udp", "20.1.1.18:0")
+	udpAddr, err := net.ResolveUDPAddr("udp", "192.168.12.2:0")
 	// connect to remote server via ws
 	bindLn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
