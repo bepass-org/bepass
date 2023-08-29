@@ -289,7 +289,6 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 				})
 			}
 
-			// 把消息写给remote sever
 			if _, err := target.Write(pk.Data); err != nil {
 				sf.logger.Errorf("write data to remote %s failed, %v", target.RemoteAddr().String(), err)
 				return
@@ -301,8 +300,8 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 	defer sf.bufferPool.Put(buf)
 
 	for {
-		_, err := request.Reader.Read(buf[:cap(buf)])
-		// sf.logger.Errorf("read data from client %s, %d bytesm, err is %+v", request.RemoteAddr.String(), num, err)
+		num, err := request.Reader.Read(buf[:cap(buf)])
+		sf.logger.Errorf("read data from client %s, %d bytesm, err is %+v", request.RemoteAddr.String(), num, err)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -327,23 +326,25 @@ func SendReply(w io.Writer, rep uint8, bindAddr net.Addr) error {
 		},
 	}
 
-	/*if rsp.Response == statute.RepSuccess {
-		if tcpAddr, ok := bindAddr.(*net.TCPAddr); ok && tcpAddr != nil {
-			rsp.BndAddr.IP = tcpAddr.IP
-			rsp.BndAddr.Port = tcpAddr.Port
-		} else if udpAddr, ok := bindAddr.(*net.UDPAddr); ok && udpAddr != nil {
-			rsp.BndAddr.IP = udpAddr.IP
-			rsp.BndAddr.Port = udpAddr.Port
-		} else {
-			rsp.Response = statute.RepAddrTypeNotSupported
-		}
+	if bindAddr != nil {
+		if rsp.Response == statute.RepSuccess {
+			if tcpAddr, ok := bindAddr.(*net.TCPAddr); ok && tcpAddr != nil {
+				rsp.BndAddr.IP = tcpAddr.IP
+				rsp.BndAddr.Port = tcpAddr.Port
+			} else if udpAddr, ok := bindAddr.(*net.UDPAddr); ok && udpAddr != nil {
+				rsp.BndAddr.IP = udpAddr.IP
+				rsp.BndAddr.Port = udpAddr.Port
+			} else {
+				rsp.Response = statute.RepAddrTypeNotSupported
+			}
 
-		if rsp.BndAddr.IP.To4() != nil {
-			rsp.BndAddr.AddrType = statute.ATYPIPv4
-		} else if rsp.BndAddr.IP.To16() != nil {
-			rsp.BndAddr.AddrType = statute.ATYPIPv6
+			if rsp.BndAddr.IP.To4() != nil {
+				rsp.BndAddr.AddrType = statute.ATYPIPv4
+			} else if rsp.BndAddr.IP.To16() != nil {
+				rsp.BndAddr.AddrType = statute.ATYPIPv6
+			}
 		}
-	}*/
+	}
 	// Send the message
 	_, err := w.Write(rsp.Bytes())
 	return err

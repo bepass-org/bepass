@@ -1,14 +1,18 @@
 package core
 
 import (
-	"bepass/cache"
+	"bepass/bufferpool"
 	"bepass/dialer"
 	"bepass/doh"
 	"bepass/logger"
 	"bepass/resolve"
 	"bepass/server"
 	"bepass/socks5"
+	"bepass/transport"
+	"bepass/utils"
+	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -43,7 +47,7 @@ type Config struct {
 var s5 *socks5.Server
 
 func RunServer(config *Config, captureCTRLC bool) error {
-	appCache := cache.NewCache(time.Duration(config.DnsCacheTTL) * time.Second)
+	appCache := utils.NewCache(time.Duration(config.DnsCacheTTL) * time.Second)
 
 	var resolveSystem string
 	var dohClient *doh.Client
@@ -62,6 +66,27 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		TLSPaddingEnabled:     config.TLSPaddingEnabled,
 		TLSPaddingSize:        config.TLSPaddingSize,
 		ProxyAddress:          fmt.Sprintf("socks5://%s", config.BindAddress),
+	}
+
+	wsTunnel := &transport.WSTunnel{
+		BindAddress:        config.BindAddress,
+		Dialer:             dialer_,
+		Logger:             appLogger,
+		ReadTimeout:        300,
+		WriteTimeout:       300,
+		LinkIdleTimeout:    300,
+		EstablishedTunnels: make(map[string]*transport.EstablishedTunnel),
+		ShortClientID:      utils.ShortID(6),
+	}
+
+	transport_ := &transport.Transport{
+		WorkerAddress: config.WorkerAddress,
+		BindAddress:   config.BindAddress,
+		Logger:        appLogger,
+		Dialer:        dialer_,
+		BufferPool:    bufferpool.NewPool(32 * 1024),
+		UDPBind:       "20.1.1.18:0",
+		Tunnel:        wsTunnel,
 	}
 
 	if strings.HasPrefix(config.RemoteDNSAddr, "https://") {
@@ -101,6 +126,7 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		EnableLowLevelSockets: config.EnableLowLevelSockets,
 		Dialer:                dialer_,
 		LocalResolver:         localResolver,
+		Transport:             transport_,
 	}
 
 	if captureCTRLC {
@@ -113,9 +139,22 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		}()
 	}
 
-	s5 = socks5.NewServer(
-		socks5.WithConnectHandle(serverHandler.Handle),
-	)
+	if workerConfig.WorkerEnabled && !workerConfig.WorkerDNSOnly {
+		s5 = socks5.NewServer(
+			socks5.WithConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+				return serverHandler.Handle(ctx, w, req, "tcp")
+			}),
+			socks5.WithAssociateHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+				return serverHandler.Handle(ctx, w, req, "udp")
+			}),
+		)
+	} else {
+		s5 = socks5.NewServer(
+			socks5.WithConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+				return serverHandler.Handle(ctx, w, req, "tcp")
+			}),
+		)
+	}
 
 	fmt.Println("Starting socks, http server:", config.BindAddress)
 	if err := s5.ListenAndServe("tcp", config.BindAddress); err != nil {

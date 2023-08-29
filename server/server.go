@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bepass/cache"
 	"bepass/dialer"
 	"bepass/doh"
 	"bepass/logger"
@@ -9,6 +8,7 @@ import (
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bepass/transport"
+	"bepass/utils"
 	"bytes"
 	"context"
 	"fmt"
@@ -44,7 +44,7 @@ type WorkerConfig struct {
 
 type Server struct {
 	RemoteDNSAddr         string
-	Cache                 *cache.Cache
+	Cache                 *utils.Cache
 	ResolveSystem         string
 	DoHClient             *doh.Client
 	ChunkConfig           ChunkConfig
@@ -54,6 +54,7 @@ type Server struct {
 	BindAddress           string
 	EnableLowLevelSockets bool
 	LocalResolver         *resolve.LocalResolver
+	Transport             *transport.Transport
 }
 
 var sniRegex = regexp.MustCompile(`^(?:[a-z0-9-]+\.)+[a-z]+$`)
@@ -329,16 +330,12 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 }
 
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
-func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request) error {
+func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, network string) error {
 	if s.WorkerConfig.WorkerEnabled &&
 		!s.WorkerConfig.WorkerDNSOnly &&
-		(!strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
-		if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
-			s.Logger.Errorf("failed to send reply: %v", err)
-			return err
-		}
-		// , s.WorkerConfig.WorkerIPPortAddress
-		return transport.TunnelToWorkerThroughWs(ctx, w, req, s.WorkerConfig.WorkerAddress, s.BindAddress, s.Logger, s.Dialer)
+		(network == "udp" || !strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
+
+		return s.Transport.Handle(network, w, req)
 	}
 
 	IPPort, err := s.resolveDestination(ctx, req)
