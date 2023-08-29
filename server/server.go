@@ -397,7 +397,7 @@ func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (s
 // sendChunks sends chunks from bepass to dst
 func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	dataBuffer := make([]byte, 256*1024)
+	dataBuffer := make([]byte, 32*1024)
 
 	for index := 0; ; index++ {
 		bytesRead, err := src.Read(dataBuffer)

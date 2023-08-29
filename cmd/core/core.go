@@ -35,7 +35,11 @@ type Config struct {
 	EnableDNSFragmentation bool            `mapstructure:"EnableDNSFragmentation"`
 	RemoteDNSAddr          string          `mapstructure:"RemoteDNSAddr"`
 	BindAddress            string          `mapstructure:"BindAddress"`
+	UDPBindAddress         string          `mapstructure:"UDPBindAddress"`
 	ChunksLengthBeforeSni  [2]int          `mapstructure:"ChunksLengthBeforeSni"`
+	UDPReadTimeout         int             `mapstructure:"UDPReadTimeout"`
+	UDPWriteTimeout        int             `mapstructure:"UDPWriteTimeout"`
+	UDPLinkIdleTimeout     int64           `mapstructure:"UDPLinkIdleTimeout"`
 	SniChunksLength        [2]int          `mapstructure:"SniChunksLength"`
 	ChunksLengthAfterSni   [2]int          `mapstructure:"ChunksLengthAfterSni"`
 	DelayBetweenChunks     [2]int          `mapstructure:"DelayBetweenChunks"`
@@ -72,9 +76,9 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		BindAddress:        config.BindAddress,
 		Dialer:             dialer_,
 		Logger:             appLogger,
-		ReadTimeout:        300,
-		WriteTimeout:       300,
-		LinkIdleTimeout:    300,
+		ReadTimeout:        config.UDPReadTimeout,
+		WriteTimeout:       config.UDPWriteTimeout,
+		LinkIdleTimeout:    config.UDPLinkIdleTimeout,
 		EstablishedTunnels: make(map[string]*transport.EstablishedTunnel),
 		ShortClientID:      utils.ShortID(6),
 	}
@@ -85,7 +89,7 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		Logger:        appLogger,
 		Dialer:        dialer_,
 		BufferPool:    bufferpool.NewPool(32 * 1024),
-		UDPBind:       "20.1.1.18:0",
+		UDPBind:       config.UDPBindAddress,
 		Tunnel:        wsTunnel,
 	}
 

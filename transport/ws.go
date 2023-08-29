@@ -145,7 +145,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 						//1- unpack the message
 						//2- find the channel that message should write on
 						//3- write the message on that channel
-						rawPacket := make([]byte, 256*1024)
+						rawPacket := make([]byte, 32*1024)
 						n, err := conn.Read(rawPacket)
 						if n < 2 && err == nil {
 							continue

@@ -101,14 +101,14 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 }
 
 func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
-	buf := make([]byte, 256*1024)
+	buf := make([]byte, 32*1024)
 
 	_, err := io.CopyBuffer(writer, reader, buf[:cap(buf)])
 	return err
 }
 
 func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
-	udpAddr, err := net.ResolveUDPAddr("udp", "192.168.12.2:0")
+	udpAddr, err := net.ResolveUDPAddr("udp", t.UDPBind+":0")
 	// connect to remote server via ws
 	bindLn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
