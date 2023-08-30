@@ -4,7 +4,6 @@ import (
 	"bepass/bufferpool"
 	"bepass/dialer"
 	"bepass/doh"
-	"bepass/logger"
 	"bepass/resolve"
 	"bepass/server"
 	"bepass/socks5"
@@ -13,7 +12,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -56,16 +54,11 @@ func RunServer(config *Config, captureCTRLC bool) error {
 	var resolveSystem string
 	var dohClient *doh.Client
 
-	stdLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
-	appLogger := logger.NewLogger(stdLogger)
-
 	localResolver := &resolve.LocalResolver{
-		Logger: appLogger,
-		Hosts:  config.Hosts,
+		Hosts: config.Hosts,
 	}
 
 	dialer_ := &dialer.Dialer{
-		Logger:                appLogger,
 		EnableLowLevelSockets: config.EnableLowLevelSockets,
 		TLSPaddingEnabled:     config.TLSPaddingEnabled,
 		TLSPaddingSize:        config.TLSPaddingSize,
@@ -75,7 +68,6 @@ func RunServer(config *Config, captureCTRLC bool) error {
 	wsTunnel := &transport.WSTunnel{
 		BindAddress:        config.BindAddress,
 		Dialer:             dialer_,
-		Logger:             appLogger,
 		ReadTimeout:        config.UDPReadTimeout,
 		WriteTimeout:       config.UDPWriteTimeout,
 		LinkIdleTimeout:    config.UDPLinkIdleTimeout,
@@ -86,7 +78,6 @@ func RunServer(config *Config, captureCTRLC bool) error {
 	transport_ := &transport.Transport{
 		WorkerAddress: config.WorkerAddress,
 		BindAddress:   config.BindAddress,
-		Logger:        appLogger,
 		Dialer:        dialer_,
 		BufferPool:    bufferpool.NewPool(32 * 1024),
 		UDPBind:       config.UDPBindAddress,
@@ -123,7 +114,6 @@ func RunServer(config *Config, captureCTRLC bool) error {
 		Cache:                 appCache,
 		ResolveSystem:         resolveSystem,
 		DoHClient:             dohClient,
-		Logger:                appLogger,
 		ChunkConfig:           chunkConfig,
 		WorkerConfig:          workerConfig,
 		BindAddress:           config.BindAddress,

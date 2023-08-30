@@ -1,159 +1,154 @@
 package logger
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"runtime"
 	"time"
 )
 
-// Logger is used to provide debug logger
-type Logger interface {
-	Errorf(format string, args ...interface{})
-	Error(args ...interface{})
-	Info(args ...interface{})
-	Infof(format string, args ...interface{})
-	Debug(args ...interface{})
-	Debugf(format string, args ...interface{})
-	Warn(args ...interface{})
-	Warnf(format string, args ...interface{})
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Panic(args ...interface{})
-}
-
-// Std represents a standard logger
-type Std struct {
-	*log.Logger
-}
-
-// NewLogger creates a new standard logger with log.Logger
-func NewLogger(l *log.Logger) *Std {
-	return &Std{l}
-}
-
-// logLevel represents the log level
-type logLevel int
-
 const (
-	logLevelError logLevel = iota
-	logLevelInfo
-	logLevelDebug
-	logLevelWarn
-	logLevelFatal
-	logLevelPanic
+	LevelTrace = slog.Level(-6)
+	LevelFatal = slog.Level(10)
+	LevelPanic = slog.Level(12)
 )
 
-// logLevelColors represents the ANSI color codes for log levels
-var logLevelColors = map[logLevel]string{
-	logLevelError: "\033[31m", // Red
-	logLevelInfo:  "\033[0m",  // Default
-	logLevelDebug: "\033[36m", // Cyan
-	logLevelWarn:  "\033[33m", // Yellow
-	logLevelFatal: "\033[31m", // Red
-	logLevelPanic: "\033[35m", // Magenta
+var LevelNames = map[slog.Leveler]string{
+	LevelTrace: "TRACE",
+	LevelFatal: "FATAL",
+	LevelPanic: "PANIC",
 }
 
-// logLevelNames represents the names of log levels
-var logLevelNames = map[logLevel]string{
-	logLevelError: "E",
-	logLevelInfo:  "I",
-	logLevelDebug: "D",
-	logLevelWarn:  "W",
-	logLevelFatal: "F",
-	logLevelPanic: "P",
-}
+var logger *slog.Logger
 
-// logMessage represents a log message
-type logMessage struct {
-	level   logLevel
-	message string
-}
+func init() {
+	replace := func(groups []string, a slog.Attr) slog.Attr {
+		// Format time.
+		if a.Key == slog.TimeKey && len(groups) == 0 {
+			t := a.Value.Time().Format("2006-01-02 15:04:05")
+			return slog.Attr{Key: slog.TimeKey, Value: slog.AnyValue(t)}
+		}
 
-// logf logs a formatted message with a log level
-func (sf Std) logf(level logLevel, format string, args ...interface{}) {
-	msg := logMessage{
-		level:   level,
-		message: fmt.Sprintf(format, args...),
+		// Format level label.
+		if a.Key == slog.LevelKey {
+			level := a.Value.Any().(slog.Level)
+			levelLabel, exists := LevelNames[level]
+
+			if !exists {
+				levelLabel = level.String()
+			}
+			a.Value = slog.StringValue(levelLabel)
+			return a
+		}
+
+		// Remove the directory from the source's filename.
+		if a.Key == slog.SourceKey {
+			source := a.Value.Any().(*slog.Source)
+			source.File = filepath.Base(source.File)
+		}
+		return a
 	}
-	sf.log(msg)
-}
 
-// log logs a message with a log level
-func (sf Std) loge(level logLevel, args ...interface{}) {
-	msg := logMessage{
-		level:   level,
-		message: fmt.Sprint(args...),
+	_, ok := os.LookupEnv("bepassDev")
+	if ok {
+		logger = slog.New(slog.NewTextHandler(os.Stdout,
+			&slog.HandlerOptions{AddSource: true, Level: LevelTrace, ReplaceAttr: replace}))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stdout,
+			&slog.HandlerOptions{AddSource: false, Level: slog.LevelInfo, ReplaceAttr: replace}))
 	}
-	sf.log(msg)
 }
 
-// log logs a log message
-func (sf Std) log(msg logMessage) {
-	logTime := time.Now().Format("2006-01-02 15:04:05")
-	levelColor := logLevelColors[msg.level]
-	levelName := logLevelNames[msg.level]
-
-	logFormat := "%s [%s]: %s\033[0m"
-
-	sf.Printf(logFormat, logTime, levelColor+levelName, msg.message)
+func GetLogger() *slog.Logger {
+	return logger
 }
 
-// Errorf implements the Logger interface for formatted error messages
-func (sf Std) Errorf(format string, args ...interface{}) {
-	sf.logf(logLevelError, format, args...)
+func log(ctx context.Context, level slog.Level, msg string, args ...any) {
+	if !logger.Enabled(ctx, level) {
+		return
+	}
+
+	var pcs [1]uintptr
+	runtime.Callers(3, pcs[:])
+	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
+	r.Add(args...)
+	_ = logger.Handler().Handle(ctx, r)
 }
 
-// Error implements the Logger interface for error messages
-func (sf Std) Error(args ...interface{}) {
-	sf.loge(logLevelError, args...)
+func logf(ctx context.Context, level slog.Level, format string, args ...any) {
+	if !logger.Enabled(ctx, level) {
+		return
+	}
+
+	var pcs [1]uintptr
+	runtime.Callers(3, pcs[:])
+	r := slog.NewRecord(time.Now(), level, fmt.Sprintf(format, args...), pcs[0])
+	_ = logger.Handler().Handle(ctx, r)
 }
 
-// Infof implements the Logger interface for formatted info messages
-func (sf Std) Infof(format string, args ...interface{}) {
-	sf.logf(logLevelInfo, format, args...)
+func Error(msg string, args ...any) {
+	log(context.Background(), slog.LevelError, msg, args...)
 }
 
-// Info implements the Logger interface for info messages
-func (sf Std) Info(args ...interface{}) {
-	sf.loge(logLevelInfo, args...)
+func Errorf(format string, args ...any) {
+	logf(context.Background(), slog.LevelError, format, args...)
 }
 
-// Debugf implements the Logger interface for formatted debug messages
-func (sf Std) Debugf(format string, args ...interface{}) {
-	sf.logf(logLevelDebug, format, args...)
+func ErrorContext(ctx context.Context, msg string, args ...any) {
+	log(ctx, slog.LevelError, msg, args...)
 }
 
-// Debug implements the Logger interface for debug messages
-func (sf Std) Debug(args ...interface{}) {
-	sf.loge(logLevelDebug, args...)
+func Info(msg string, args ...any) {
+	log(context.Background(), slog.LevelInfo, msg, args...)
 }
 
-// Warnf implements the Logger interface for formatted warning messages
-func (sf Std) Warnf(format string, args ...interface{}) {
-	sf.logf(logLevelWarn, format, args...)
+func Infof(format string, args ...any) {
+	logf(context.Background(), slog.LevelInfo, format, args...)
 }
 
-// Warn implements the Logger interface for warning messages
-func (sf Std) Warn(args ...interface{}) {
-	sf.loge(logLevelWarn, args...)
+func Warn(msg string, args ...any) {
+	log(context.Background(), slog.LevelWarn, msg, args...)
 }
 
-// Fatalf implements the Logger interface for formatted fatal messages
-func (sf Std) Fatalf(format string, args ...interface{}) {
-	sf.logf(logLevelFatal, format, args...)
+func Warnf(format string, args ...any) {
+	logf(context.Background(), slog.LevelWarn, format, args...)
 }
 
-// Fatal implements the Logger interface for fatal messages
-func (sf Std) Fatal(args ...interface{}) {
-	sf.loge(logLevelFatal, args...)
+func Debug(msg string, args ...any) {
+	log(context.Background(), slog.LevelDebug, msg, args...)
 }
 
-// Panicf implements the Logger interface for formatted panicmessages
-func (sf Std) Panicf(format string, args ...interface{}) {
-	sf.logf(logLevelPanic, format, args...)
+func Debugf(format string, args ...any) {
+	logf(context.Background(), slog.LevelDebug, format, args...)
 }
 
-// Panic implements the Logger interface for panic messages
-func (sf Std) Panic(args ...interface{}) {
-	sf.loge(logLevelPanic, args...)
+func Trace(msg string, args ...any) {
+	log(context.Background(), LevelTrace, msg, args...)
+}
+
+func Tracef(format string, args ...any) {
+	logf(context.Background(), LevelTrace, format, args...)
+}
+
+func Fatal(msg string, args ...any) {
+	log(context.Background(), LevelFatal, msg, args...)
+	os.Exit(1)
+}
+
+func Fatalf(format string, args ...any) {
+	logf(context.Background(), LevelFatal, format, args...)
+	os.Exit(1)
+}
+
+func Panic(msg string, args ...any) {
+	log(context.Background(), LevelPanic, msg, args...)
+	panic(msg)
+}
+
+func Panicf(format string, args ...any) {
+	logf(context.Background(), LevelPanic, format, args...)
+	panic(fmt.Sprintf(format, args...))
 }

@@ -6,11 +6,12 @@ import (
 	"bepass/wsconnadapter"
 	"context"
 	"encoding/binary"
-	"github.com/gorilla/websocket"
-	"golang.org/x/net/proxy"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"golang.org/x/net/proxy"
 )
 
 type EstablishedTunnel struct {
@@ -22,7 +23,6 @@ type EstablishedTunnel struct {
 type WSTunnel struct {
 	BindAddress        string
 	Dialer             *dialer.Dialer
-	Logger             *logger.Std
 	ReadTimeout        int
 	WriteTimeout       int
 	LinkIdleTimeout    int64
@@ -83,13 +83,13 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 			done := make(chan struct{})
 			doneR := make(chan struct{})
 
-			w.Logger.Printf("connecting to %s\r\n", tunnelEndpoint)
+			logger.Infof("connecting to %s\r\n", tunnelEndpoint)
 
 			c, err := w.Dial(tunnelEndpoint)
 			conn := wsconnadapter.New(c)
 
 			if err != nil {
-				w.Logger.Errorf("error dialing udp over tcp tunnel: %v\r\n", err)
+				logger.Errorf("error dialing udp over tcp tunnel: %v\r\n", err)
 				continue
 			}
 			//write
@@ -99,7 +99,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 					_ = conn.Close()
 				}()
 
-				defer w.Logger.Println("write closed")
+				defer logger.Info("write closed")
 
 				for {
 					select {
@@ -116,7 +116,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 
 						_, err = conn.Write(append([]byte(w.ShortClientID), append(bs, rt.Data...)...))
 						if err != nil {
-							w.Logger.Println("write:", err)
+							logger.Info("write:", err)
 							return
 						}
 						lastActivityStamp = time.Now().Unix()
@@ -135,7 +135,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 				if err != nil {
 					return
 				}
-				defer w.Logger.Println("read closed")
+				defer logger.Info("read closed")
 				for {
 					select {
 					case <-doneR:
@@ -154,10 +154,10 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 						if err != nil {
 							if strings.Contains(err.Error(), "websocket: close") ||
 								strings.Contains(err.Error(), "i/o") {
-								w.Logger.Errorf("reading from udp over tcp error: %v\r\n", err)
+								logger.Errorf("reading from udp over tcp error: %v\r\n", err)
 								return
 							}
-							w.Logger.Errorf("reading from udp over tcp tunnel packet size error: %v\r\n", err)
+							logger.Errorf("reading from udp over tcp tunnel packet size error: %v\r\n", err)
 							continue
 						}
 

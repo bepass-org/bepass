@@ -6,15 +6,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/net/proxy"
 	"io"
-	"log"
 	"net"
 	"net/http"
-	"os"
+
+	"golang.org/x/net/proxy"
 
 	"bepass/logger"
 	"bepass/socks5/statute"
+
 	"github.com/elazarl/goproxy"
 )
 
@@ -46,9 +46,6 @@ type Server struct {
 	rewriter AddressRewriter
 	// bindIP is used for bind or udp associate
 	bindIP net.IP
-	// logger can be used to provide a custom log target.
-	// Defaults to io.Discard.
-	logger logger.Logger
 	// Optional function for dialing out
 	dial func(ctx context.Context, network, addr string) (net.Conn, error)
 	// buffer pool
@@ -66,14 +63,11 @@ type Server struct {
 
 // NewServer creates a new Server
 func NewServer(opts ...Option) *Server {
-	stdLogger := log.New(os.Stderr, "socksLogger", log.Ldate|log.Ltime)
-	socksLogger := logger.NewLogger(stdLogger)
 	srv := &Server{
 		authMethods: []Authenticator{},
 		bufferPool:  bufferpool.NewPool(32 * 1024),
 		resolver:    DNSResolver{},
 		rules:       NewPermitAll(),
-		logger:      socksLogger,
 		dial: func(ctx context.Context, net_, addr string) (net.Conn, error) {
 			return net.Dial(net_, addr)
 		},
@@ -145,16 +139,16 @@ func (sf *Server) Serve() error {
 		if err != nil {
 			select {
 			case <-sf.done:
-				sf.logger.Info("Shutting socks5 server done")
+				logger.Info("Shutting socks5 server done")
 				return nil
 			default:
-				sf.logger.Errorf("Accept failed: %v", err)
+				logger.Errorf("Accept failed: %v", err)
 				return err
 			}
 		}
 		sf.goFunc(func() {
 			if err := sf.ServeConn(conn); err != nil {
-				sf.logger.Errorf("server: %v", err)
+				logger.Errorf("server: %v", err)
 			}
 		})
 	}

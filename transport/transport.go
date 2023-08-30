@@ -34,7 +34,6 @@ type UDPConf struct {
 type Transport struct {
 	WorkerAddress string
 	BindAddress   string
-	Logger        *logger.Std
 	Dialer        *dialer.Dialer
 	BufferPool    bufferpool.BufPool
 	UDPBind       string
@@ -52,7 +51,7 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 		return t.TunnelUDP(w, req)
 	}
 	if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
-		t.Logger.Errorf("failed to send reply: %v", err)
+		logger.Errorf("failed to send reply: %v", err)
 		return err
 	}
 
@@ -61,7 +60,7 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
 		}
-		t.Logger.Printf("Could not split host and port: %v\n", err)
+		logger.Infof("Could not split host and port: %v\n", err)
 		return err
 	}
 
@@ -70,7 +69,7 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
 		}
-		t.Logger.Printf("Can not connect: %v\n", err)
+		logger.Infof("Can not connect: %v\n", err)
 		return err
 	}
 
@@ -119,7 +118,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 	}
 	fmt.Println(bindLn.LocalAddr())
 	if err := socks5.SendReply(w, statute.RepSuccess, bindLn.LocalAddr()); err != nil {
-		t.Logger.Errorf("failed to send reply: %v", err)
+		logger.Errorf("failed to send reply: %v", err)
 		return err
 	}
 
@@ -128,14 +127,14 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
 		}
-		t.Logger.Printf("Could not split host and port: %v\n", err)
+		logger.Infof("Could not split host and port: %v\n", err)
 		return err
 	}
 
 	bindWriteChannel := make(chan UDPPacket)
 	tunnelWriteChannel, channelIndex, err := t.Tunnel.PersistentDial(tunnelEndpoint, bindWriteChannel)
 	if err != nil {
-		t.Logger.Errorf("Unable to get or create tunnel for udpBindWriteChannel %v\r\n", err)
+		logger.Errorf("Unable to get or create tunnel for udpBindWriteChannel %v\r\n", err)
 		return err
 	}
 	// make new Bind
@@ -157,7 +156,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 					break
 				}
 				if strings.Contains(err.Error(), "use of closed network connection") {
-					t.Logger.Errorf("read data from bind listen address %s failed, %v", udpBind.AssociateBind.LocalAddr(), err)
+					logger.Errorf("read data from bind listen address %s failed, %v", udpBind.AssociateBind.LocalAddr(), err)
 				}
 				break
 			}

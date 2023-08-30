@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ameshkov/dnscrypt/v2"
 	"io"
 	"math/rand"
 	"net"
@@ -22,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ameshkov/dnscrypt/v2"
 
 	"github.com/miekg/dns"
 )
@@ -49,7 +50,6 @@ type Server struct {
 	DoHClient             *doh.Client
 	ChunkConfig           ChunkConfig
 	WorkerConfig          WorkerConfig
-	Logger                *logger.Std
 	Dialer                *dialer.Dialer
 	BindAddress           string
 	EnableLowLevelSockets bool
@@ -278,7 +278,7 @@ func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 		chunks[0] = data
 		return chunks
 	}
-	s.Logger.Printf("Hostname %s", string(hostname))
+	logger.Infof("Hostname %s", string(hostname))
 	index := bytes.Index(data, hostname)
 	if index == -1 {
 		return nil
@@ -344,7 +344,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 	}
 
 	if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
-		s.Logger.Errorf("failed to send reply: %v", err)
+		logger.Errorf("failed to send reply: %v", err)
 		return err
 	}
 
@@ -355,7 +355,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 	defer conn.Close()
 
 	if err := conn.SetNoDelay(true); err != nil {
-		s.Logger.Errorf("failed to set NODELAY option: %v", err)
+		logger.Errorf("failed to set NODELAY option: %v", err)
 		return err
 	}
 
@@ -384,13 +384,13 @@ func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (s
 			return "", err
 		}
 		dest.IP = net.ParseIP(ip)
-		s.Logger.Printf("resolved %s to %s", req.RawDestAddr, dest)
+		logger.Infof("resolved %s to %s", req.RawDestAddr, dest)
 	} else {
-		s.Logger.Printf("skipping resolution for %s", req.RawDestAddr)
+		logger.Infof("skipping resolution for %s", req.RawDestAddr)
 	}
 
 	addr := net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
-	s.Logger.Printf("dialing %s", addr)
+	logger.Infof("dialing %s", addr)
 	return addr, nil
 }
 
@@ -452,7 +452,7 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 
 	// Check the cache for fqdn
 	if cachedValue, _ := s.Cache.Get(fqdn); cachedValue != nil {
-		s.Logger.Printf("using cached value for %s", fqdn)
+		logger.Infof("using cached value for %s", fqdn)
 		return cachedValue.(string), nil
 	}
 
@@ -480,7 +480,7 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 	}
 	// Parse answer and store in cache
 	answer := exchange.Answer[0]
-	s.Logger.Printf("resolved %s to %s", fqdn, answer.String())
+	logger.Infof("resolved %s to %s", fqdn, answer.String())
 	record := strings.Fields(answer.String())
 	if record[3] == "CNAME" {
 		ip, err := s.Resolve(record[4])

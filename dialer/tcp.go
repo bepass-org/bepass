@@ -1,6 +1,7 @@
 package dialer
 
 import (
+	"bepass/logger"
 	"bepass/protect"
 	"net"
 	"runtime"
@@ -31,7 +32,7 @@ func (d *Dialer) TCPDial(network, addr, hostPort string) (*net.TCPConn, error) {
 	}
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	if err != nil {
-		d.Logger.Errorf("failed to connect to %v: %v", tcpAddr, err)
+		logger.Errorf("failed to connect to %v: %v", tcpAddr, err)
 		return nil, err
 	}
 	return conn, nil
