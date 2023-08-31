@@ -1,14 +1,12 @@
 package socks5
 
 import (
+	"bepass/logger"
 	"bepass/socks5/statute"
+	"context"
 	"fmt"
 	"io"
 	"net"
-)
-
-import (
-	"context"
 	"strings"
 	"sync"
 )
@@ -217,7 +215,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 	}
 	//defer bindLn.Close()
 
-	sf.logger.Info("target addr ", target.RemoteAddr(), " listen addr: ", bindLn.LocalAddr())
+	logger.Info("", "target addr ", target.RemoteAddr(), " listen addr: ", bindLn.LocalAddr())
 	// send BND.ADDR and BND.PORT, client used
 	if err = SendReply(writer, statute.RepSuccess, bindLn.LocalAddr()); err != nil {
 		return fmt.Errorf("failed to send reply, %v", err)
@@ -239,7 +237,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 					return
 				}
 				if strings.Contains(err.Error(), "use of closed network connection") {
-					sf.logger.Errorf("read data from bind listen address %s failed, %v", bindLn.LocalAddr(), err)
+					logger.Errorf("read data from bind listen address %s failed, %v", bindLn.LocalAddr(), err)
 					return
 				}
 				continue
@@ -267,7 +265,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 							if err == io.EOF {
 								return
 							}
-							sf.logger.Errorf("read data from remote %s failed, %v", target.RemoteAddr().String(), err)
+							logger.Errorf("read data from remote %s failed, %v", target.RemoteAddr().String(), err)
 							return
 						}
 
@@ -281,7 +279,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 						proBuf = append(proBuf, pkb.Data...)
 						if _, err := bindLn.WriteTo(proBuf, srcAddr); err != nil {
 							sf.bufferPool.Put(tmpBufPool)
-							sf.logger.Errorf("write data to client %s failed, %v", bindLn.LocalAddr(), err)
+							logger.Errorf("write data to client %s failed, %v", bindLn.LocalAddr(), err)
 							return
 						}
 						sf.bufferPool.Put(tmpBufPool)
@@ -290,7 +288,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 			}
 
 			if _, err := target.Write(pk.Data); err != nil {
-				sf.logger.Errorf("write data to remote %s failed, %v", target.RemoteAddr().String(), err)
+				logger.Errorf("write data to remote %s failed, %v", target.RemoteAddr().String(), err)
 				return
 			}
 		}
@@ -301,7 +299,7 @@ func (sf *Server) handleAssociate(ctx context.Context, writer io.Writer, request
 
 	for {
 		num, err := request.Reader.Read(buf[:cap(buf)])
-		sf.logger.Errorf("read data from client %s, %d bytesm, err is %+v", request.RemoteAddr.String(), num, err)
+		logger.Errorf("read data from client %s, %d bytesm, err is %+v", request.RemoteAddr.String(), num, err)
 		if err != nil {
 			if err == io.EOF {
 				return nil

@@ -2,7 +2,6 @@ package socks5
 
 import (
 	"bepass/bufferpool"
-	"bepass/logger"
 	"context"
 	"io"
 	"net"
@@ -74,11 +73,11 @@ func WithBindIP(ip net.IP) Option {
 
 // WithLogger can be used to provide a custom log target.
 // Defaults to io.Discard.
-func WithLogger(l logger.Logger) Option {
-	return func(s *Server) {
-		s.logger = l
-	}
-}
+// func WithLogger(l logger.Logger) Option {
+// 	return func(s *Server) {
+// 		s.logger = l
+// 	}
+// }
 
 // WithDial Optional function for dialing out
 func WithDial(dial func(ctx context.Context, network, addr string) (net.Conn, error)) Option {

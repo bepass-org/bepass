@@ -1,7 +1,6 @@
 package resolve
 
 import (
-	"bepass/logger"
 	"net"
 )
 
@@ -11,8 +10,7 @@ type Hosts struct {
 }
 
 type LocalResolver struct {
-	Logger *logger.Std
-	Hosts  []Hosts
+	Hosts []Hosts
 }
 
 func (lr *LocalResolver) Resolve(domain string) string {
