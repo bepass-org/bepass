@@ -5,6 +5,7 @@ import (
 	"bepass/doh"
 	"bepass/logger"
 	"bepass/resolve"
+	"bepass/sni"
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bepass/transport"
@@ -59,9 +60,9 @@ type Server struct {
 
 // getHostname This function extracts the tls sni or http
 func (s *Server) getHostname(data []byte) ([]byte, []byte, error) {
-	hello, err := ReadClientHello(bytes.NewReader(data))
+	hello, err := sni.ReadClientHello(bytes.NewReader(data))
 	if err != nil {
-		host, data_, err := ParseHTTPHost(bytes.NewReader(data))
+		host, data_, err := sni.ParseHTTPHost(bytes.NewReader(data))
 		if err != nil {
 			return nil, data, err
 		}
