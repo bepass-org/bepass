@@ -138,7 +138,6 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
 func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, network string) error {
-	fmt.Println("here")
 	if s.WorkerConfig.WorkerEnabled &&
 		!s.WorkerConfig.WorkerDNSOnly &&
 		(network == "udp" || !strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
