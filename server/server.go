@@ -166,14 +166,18 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 	// if user has a faulty dns, and it returns dpi ip,
 	// we resolve destination based on extracted tls sni or http hostname
 	if hostname != nil && strings.Contains(IPPort, "10.10.3") {
+		logger.Infof("%s is dpi ip extracting destination host from packets...", IPPort)
 		req.RawDestAddr.FQDN = string(hostname)
 		IPPort, err = s.resolveDestination(ctx, req)
 		if err != nil {
 			// if destination resolved to dpi and we cant resolve to actual destination
 			// it's pointless to connect to dpi
+			logger.Infof("system was unable to extract destination host from packets!")
 			return err
 		}
 	}
+
+	logger.Infof("Dialing %s...", IPPort)
 
 	conn, err := s.Dialer.TCPDial("tcp", "", IPPort)
 	if err != nil {
@@ -231,7 +235,6 @@ func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (s
 	}
 
 	addr := net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
-	logger.Infof("dialing %s", addr)
 	return addr, nil
 }
 
