@@ -6,6 +6,7 @@ import (
 
 // VersionSocks5 socks5 protocol version
 const VersionSocks5 = byte(0x05)
+const VersionSocks4 = byte(0x04)
 
 // request command defined
 const (

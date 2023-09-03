@@ -3,12 +3,15 @@ package socks5
 import (
 	"bepass/bufferpool"
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 
 	"golang.org/x/net/proxy"
 
@@ -59,6 +62,7 @@ type Server struct {
 	done                chan bool
 	listen              net.Listener
 	httpProxyBindAddr   string
+	bindAddress         string
 }
 
 // NewServer creates a new Server
@@ -93,7 +97,9 @@ func (sf *Server) ListenAndServe(network, addr string) error {
 	prx := goproxy.NewProxyHttpServer()
 	prx.Verbose = true
 
-	dialer, err := proxy.SOCKS5(network, addr, nil, proxy.Direct)
+	sf.bindAddress = addr
+
+	dialer, err := proxy.SOCKS5(network, sf.bindAddress, nil, proxy.Direct)
 
 	if err != nil {
 		return err
@@ -177,12 +183,15 @@ func (sf *Server) ServeConn(conn net.Conn) error {
 	switch b[0] {
 	case statute.VersionSocks5:
 		return sf.handleSocksRequest(conn, bufConn)
+	case statute.VersionSocks4:
+		return sf.handleSocks4Request(conn, bufConn)
 	default:
 		return sf.handleHTTPRequest(conn, bufConn)
 	}
 }
 
 func (sf *Server) handleHTTPRequest(conn net.Conn, bufConn *bufio.Reader) error {
+	// redirect http to socks5
 	dstConn, err := net.Dial(sf.listen.Addr().Network(), sf.httpProxyBindAddr)
 	defer dstConn.Close()
 	if err != nil {
@@ -248,6 +257,81 @@ func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error
 	request.RemoteAddr = conn.RemoteAddr()
 	// Process the client request
 	return sf.handleRequest(conn, request)
+}
+
+func readAsString(r io.Reader) (string, error) {
+	var buff bytes.Buffer
+	var b [1]byte
+	for {
+		if _, err := io.ReadFull(r, b[:]); err != nil {
+			return "", err
+		}
+		if b[0] == 0 {
+			break
+		}
+		buff.Write(b[:])
+	}
+	return buff.String(), nil
+}
+
+func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) error {
+	var cddstportdstip [1 + 1 + 2 + 4]byte
+	var destination = ""
+	var dstHost = ""
+	if _, err := io.ReadFull(bufConn, cddstportdstip[:]); err != nil {
+		return err
+	}
+	command := cddstportdstip[1]
+	dstPort := binary.BigEndian.Uint16(cddstportdstip[2:4])
+	var dstIp net.IP = cddstportdstip[4:]
+	if command != uint8(1) {
+		return fmt.Errorf("command %d is not supported", command)
+	}
+	destination = net.JoinHostPort(dstIp.String(), strconv.Itoa(int(dstPort)))
+	// Skip USERID
+	if _, err := readAsString(bufConn); err != nil {
+		return err
+	}
+	// SOCKS4a
+	if dstIp[0] == 0 && dstIp[1] == 0 && dstIp[2] == 0 && dstIp[3] != 0 {
+		var err error
+		dstHost, err = readAsString(bufConn)
+		if err != nil {
+			return err
+		}
+	}
+
+	if dstHost != "" {
+		destination = net.JoinHostPort(dstHost, strconv.Itoa(int(dstPort)))
+	}
+
+	if _, err := conn.Write([]byte{0, 90, 0, 0, 0, 0, 0, 0}); err != nil {
+		return err
+	}
+
+	d, err := proxy.SOCKS5("tcp", sf.bindAddress, nil, proxy.Direct)
+	if err != nil {
+		return err
+	}
+	dstConn, err := d.Dial("tcp", destination)
+
+	if err != nil {
+		return err
+	}
+	var errCh = make(chan error, 2)
+	go func() {
+		_, err := io.Copy(dstConn, bufConn)
+		errCh <- err
+	}()
+	go func() {
+		_, err := io.Copy(conn, dstConn)
+		errCh <- err
+	}()
+	err = <-errCh
+	if err != nil {
+		return err
+	}
+	return <-errCh
 }
 
 // authenticate is used to handle connection authentication
