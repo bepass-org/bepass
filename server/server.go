@@ -11,6 +11,7 @@ import (
 	"bepass/utils"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -57,26 +58,28 @@ type Server struct {
 }
 
 // getHostname This function extracts the tls sni or http
-func (s *Server) getHostname(data []byte) ([]byte, error) {
+func (s *Server) getHostname(data []byte) ([]byte, []byte, error) {
 	hello, err := ReadClientHello(bytes.NewReader(data))
 	if err != nil {
-		host, err := ParseHTTPHost(bytes.NewReader(data))
+		host, data_, err := ParseHTTPHost(bytes.NewReader(data))
 		if err != nil {
-			return nil, err
+			return nil, data, err
 		}
-		return []byte(host), nil
+		return []byte(host), data_, errors.New("http request packet")
 	}
-	return []byte(hello.ServerName), nil
+	return []byte(hello.ServerName), data, nil
 }
 
 func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
 	chunks := make(map[int][]byte)
-	hostname, err := s.getHostname(data)
+	hostname, data_, err := s.getHostname(data)
+	if hostname != nil {
+		logger.Infof("Hostname %s", string(hostname))
+	}
 	if err != nil {
-		chunks[0] = data
+		chunks[0] = data_
 		return chunks
 	}
-	logger.Infof("Hostname %s", string(hostname))
 	index := bytes.Index(data, hostname)
 	if index == -1 {
 		return nil
