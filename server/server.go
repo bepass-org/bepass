@@ -71,30 +71,30 @@ func (s *Server) getHostname(data []byte) ([]byte, []byte, error) {
 	return []byte(hello.ServerName), data, nil
 }
 
-func (s *Server) getChunkedPackets(data []byte) map[int][]byte {
-	chunks := make(map[int][]byte)
-	hostname, data_, err := s.getHostname(data)
-	if hostname != nil {
-		logger.Infof("Hostname %s", string(hostname))
+func (s *Server) getChunkedPackets(data []byte) (chunks map[int][]byte, host []byte) {
+	chunks = make(map[int][]byte)
+	host, data_, err := s.getHostname(data)
+	if host != nil {
+		logger.Infof("Hostname %s", string(host))
 	}
 	if err != nil {
 		chunks[0] = data_
-		return chunks
+		return
 	}
-	index := bytes.Index(data, hostname)
+	index := bytes.Index(data, host)
 	if index == -1 {
-		return nil
+		return nil, nil
 	}
 	// before sni
 	chunks[0] = make([]byte, index)
 	copy(chunks[0], data[:index])
 	// sni
-	chunks[1] = make([]byte, len(hostname))
-	copy(chunks[1], data[index:index+len(hostname)])
+	chunks[1] = make([]byte, len(host))
+	copy(chunks[1], data[index:index+len(host)])
 	// after sni
-	chunks[2] = make([]byte, len(data)-index-len(hostname))
-	copy(chunks[2], data[index+len(hostname):])
-	return chunks
+	chunks[2] = make([]byte, len(data)-index-len(host))
+	copy(chunks[2], data[index+len(host):])
+	return
 }
 
 func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
@@ -138,6 +138,7 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
 func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, network string) error {
+	fmt.Println("here")
 	if s.WorkerConfig.WorkerEnabled &&
 		!s.WorkerConfig.WorkerDNSOnly &&
 		(network == "udp" || !strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
@@ -155,6 +156,26 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 		return err
 	}
 
+	firstPacket := make([]byte, 32*1024)
+	read, err := req.Reader.Read(firstPacket)
+	if err != nil {
+		return err
+	}
+
+	firstPacketChunks, hostname := s.getChunkedPackets(firstPacket[:read])
+
+	// if user has a faulty dns, and it returns dpi ip,
+	// we resolve destination based on extracted tls sni or http hostname
+	if hostname != nil && strings.Contains(IPPort, "10.10.3") {
+		req.RawDestAddr.FQDN = string(hostname)
+		IPPort, err = s.resolveDestination(ctx, req)
+		if err != nil {
+			// if destination resolved to dpi and we cant resolve to actual destination
+			// it's pointless to connect to dpi
+			return err
+		}
+	}
+
 	conn, err := s.Dialer.TCPDial("tcp", "", IPPort)
 	if err != nil {
 		return err
@@ -166,12 +187,26 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 		return err
 	}
 
+	// writing first packet
+	s.sendSplitChunks(conn, firstPacketChunks)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	closeSignal := make(chan error, 1)
 
-	go s.sendChunks(conn, req.Reader, true, &wg)
-	go s.sendChunks(w, conn, false, &wg)
+	go func() {
+		_, err := io.Copy(conn, req.Reader)
+		if err != nil {
+			wg.Done()
+		}
+	}()
+
+	go func() {
+		_, err := io.Copy(w, conn)
+		if err != nil {
+			wg.Done()
+		}
+	}()
 
 	go func() {
 		wg.Wait()
@@ -199,29 +234,6 @@ func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (s
 	addr := net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
 	logger.Infof("dialing %s", addr)
 	return addr, nil
-}
-
-// sendChunks sends chunks from bepass to dst
-func (s *Server) sendChunks(dst io.Writer, src io.Reader, shouldSplit bool, wg *sync.WaitGroup) {
-	defer wg.Done()
-	dataBuffer := make([]byte, 32*1024)
-
-	for index := 0; ; index++ {
-		bytesRead, err := src.Read(dataBuffer)
-		if bytesRead > 0 {
-			// check if it's the first packet and its tls packet
-			if index == 0 && shouldSplit {
-				chunks := s.getChunkedPackets(dataBuffer[:bytesRead])
-				s.sendSplitChunks(dst, chunks)
-			} else {
-				_, _ = dst.Write(dataBuffer[:bytesRead])
-			}
-		}
-
-		if err != nil {
-			return
-		}
-	}
 }
 
 // Resolve resolves the FQDN to an IP address using the specified resolution mechanism.
