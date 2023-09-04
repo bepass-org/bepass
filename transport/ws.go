@@ -1,3 +1,4 @@
+// Package transport provides WebSocket tunneling functionality.
 package transport
 
 import (
@@ -14,12 +15,14 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// EstablishedTunnel represents an established tunnel.
 type EstablishedTunnel struct {
 	tunnelWriteChannel chan UDPPacket
 	bindWriteChannels  map[uint16]chan UDPPacket
 	channelIndex       uint16
 }
 
+// WSTunnel represents a WebSocket tunnel.
 type WSTunnel struct {
 	BindAddress        string
 	Dialer             *dialer.Dialer
@@ -30,7 +33,8 @@ type WSTunnel struct {
 	ShortClientID      string
 }
 
-func (w *WSTunnel) socks5TCPDial(ctx context.Context, network, addr string) (net.Conn, error) {
+// socks5TCPDial dials using SOCKS5 proxy.
+func (w *WSTunnel) socks5TCPDial(_ context.Context, network, addr string) (net.Conn, error) {
 	d, err := proxy.SOCKS5("tcp", w.BindAddress, nil, proxy.Direct)
 	if err != nil {
 		return nil, err
@@ -38,6 +42,7 @@ func (w *WSTunnel) socks5TCPDial(ctx context.Context, network, addr string) (net
 	return d.Dial(network, addr)
 }
 
+// Dial establishes a WebSocket connection.
 func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	d := websocket.Dialer{
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -55,6 +60,7 @@ func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	return conn, err
 }
 
+// PersistentDial establishes a persistent WebSocket connection.
 func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan UDPPacket) (chan UDPPacket, uint16, error) {
 	if tunnel, ok := w.EstablishedTunnels[tunnelEndpoint]; ok {
 		tunnel.channelIndex = tunnel.channelIndex + 1
@@ -92,7 +98,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 				logger.Errorf("error dialing udp over tcp tunnel: %v\r\n", err)
 				continue
 			}
-			//write
+			// Write
 			go func() {
 				defer func() {
 					close(doneR)
@@ -124,7 +130,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 				}
 			}()
 
-			//read
+			// Read
 			func() {
 				defer func() {
 					close(done)
@@ -142,9 +148,9 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 						return
 
 					default:
-						//1- unpack the message
-						//2- find the channel that message should write on
-						//3- write the message on that channel
+						// 1- unpack the message
+						// 2- find the channel that the message should write on
+						// 3- write the message on that channel
 						rawPacket := make([]byte, 32*1024)
 						n, err := conn.Read(rawPacket)
 						if n < 2 && err == nil {
@@ -157,11 +163,11 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 								logger.Errorf("reading from udp over tcp error: %v\r\n", err)
 								return
 							}
-							logger.Errorf("reading from udp over tcp tunnel packet size error: %v\r\n", err)
+							logger.Errorf("reading from udp over TCP tunnel packet size error: %v\r\n", err)
 							continue
 						}
 
-						// first 2 packets of response is channel id
+						// The first 2 packets of response are channel ID
 						channelID := binary.BigEndian.Uint16(rawPacket[:2])
 
 						pkt := UDPPacket{
