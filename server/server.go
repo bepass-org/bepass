@@ -1,3 +1,4 @@
+// Package server provides the implementation of a SOCKS5 server with DNS resolution capabilities.
 package server
 
 import (
@@ -24,11 +25,10 @@ import (
 	"time"
 
 	"github.com/ameshkov/dnscrypt/v2"
-
 	"github.com/miekg/dns"
 )
 
-// ChunkConfig Constants for chunk lengths and delays.
+// ChunkConfig contains constants for chunk lengths and delays.
 type ChunkConfig struct {
 	TLSHeaderLength int
 	BeforeSniLength [2]int
@@ -36,7 +36,7 @@ type ChunkConfig struct {
 	Delay           [2]int
 }
 
-// WorkerConfig Constants for cloudflare worker.
+// WorkerConfig contains constants for the cloudflare worker.
 type WorkerConfig struct {
 	WorkerAddress       string
 	WorkerIPPortAddress string
@@ -44,6 +44,7 @@ type WorkerConfig struct {
 	WorkerDNSOnly       bool
 }
 
+// Server represents a SOCKS5 server with DNS resolution capabilities.
 type Server struct {
 	RemoteDNSAddr         string
 	Cache                 *utils.Cache
@@ -58,45 +59,47 @@ type Server struct {
 	Transport             *transport.Transport
 }
 
-// getHostname This function extracts the tls sni or http
+// getHostname extracts the TLS SNI or HTTP host from the provided data.
 func (s *Server) getHostname(data []byte) ([]byte, []byte, error) {
 	hello, err := sni.ReadClientHello(bytes.NewReader(data))
 	if err != nil {
-		host, data_, err := sni.ParseHTTPHost(bytes.NewReader(data))
+		host, data, err := sni.ParseHTTPHost(bytes.NewReader(data))
 		if err != nil {
 			return nil, data, err
 		}
-		return []byte(host), data_, errors.New("http request packet")
+		return []byte(host), data, errors.New("HTTP request packet")
 	}
 	return []byte(hello.ServerName), data, nil
 }
 
+// getChunkedPackets splits the data into chunks based on the SNI or HTTP host.
 func (s *Server) getChunkedPackets(data []byte) (chunks map[int][]byte, host []byte) {
 	chunks = make(map[int][]byte)
-	host, data_, err := s.getHostname(data)
+	host, data, err := s.getHostname(data)
 	if host != nil {
 		logger.Infof("Hostname %s", string(host))
 	}
 	if err != nil {
-		chunks[0] = data_
+		chunks[0] = data
 		return
 	}
 	index := bytes.Index(data, host)
 	if index == -1 {
 		return nil, nil
 	}
-	// before sni
+	// Before SNI
 	chunks[0] = make([]byte, index)
 	copy(chunks[0], data[:index])
-	// sni
+	// SNI
 	chunks[1] = make([]byte, len(host))
 	copy(chunks[1], data[index:index+len(host)])
-	// after sni
+	// After SNI
 	chunks[2] = make([]byte, len(data)-index-len(host))
 	copy(chunks[2], data[index+len(host):])
 	return
 }
 
+// sendSplitChunks sends the split chunks to the destination.
 func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 	chunkLengthMin, chunkLengthMax := s.ChunkConfig.BeforeSniLength[0], s.ChunkConfig.BeforeSniLength[1]
 	if len(chunks) > 1 {
@@ -125,8 +128,8 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 				delay = s.ChunkConfig.Delay[0]
 			}
 
-			_, errWrite := dst.Write(chunk[position : position+chunkLength])
-			if errWrite != nil {
+			_, err := dst.Write(chunk[position : position+chunkLength])
+			if err != nil {
 				return
 			}
 
@@ -137,7 +140,7 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 }
 
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
-func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, network string) error {
+func (s *Server) Handle(_ context.Context, w io.Writer, req *socks5.Request, network string) error {
 	if s.WorkerConfig.WorkerEnabled &&
 		!s.WorkerConfig.WorkerDNSOnly &&
 		(network == "udp" || !strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
@@ -145,7 +148,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 		return s.Transport.Handle(network, w, req)
 	}
 
-	IPPort, err := s.resolveDestination(ctx, req)
+	IPPort, err := s.resolveDestination(req)
 	if err != nil {
 		return err
 	}
@@ -163,15 +166,15 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 
 	firstPacketChunks, hostname := s.getChunkedPackets(firstPacket[:read])
 
-	// if user has a faulty dns, and it returns dpi ip,
-	// we resolve destination based on extracted tls sni or http hostname
+	// If the user has a faulty DNS, and it returns a DPI IP,
+	// we resolve the destination based on the extracted TLS SNI or HTTP hostname.
 	if hostname != nil && strings.Contains(IPPort, "10.10.3") {
-		logger.Infof("%s is dpi ip extracting destination host from packets...", IPPort)
+		logger.Infof("%s is DPI IP, extracting destination host from packets...", IPPort)
 		req.RawDestAddr.FQDN = string(hostname)
-		IPPort, err = s.resolveDestination(ctx, req)
+		IPPort, err = s.resolveDestination(req)
 		if err != nil {
-			// if destination resolved to dpi and we cant resolve to actual destination
-			// it's pointless to connect to dpi
+			// If the destination resolved to DPI and we can't resolve to the actual destination,
+			// it's pointless to connect to DPI.
 			logger.Infof("system was unable to extract destination host from packets!")
 			return err
 		}
@@ -190,7 +193,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 		return err
 	}
 
-	// writing first packet
+	// Writing the first packet
 	s.sendSplitChunks(conn, firstPacketChunks)
 
 	var wg sync.WaitGroup
@@ -220,7 +223,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 }
 
 // resolveDestination resolves the destination address using DNS.
-func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (string, error) {
+func (s *Server) resolveDestination(req *socks5.Request) (string, error) {
 	dest := req.RawDestAddr
 
 	if dest.FQDN != "" {
@@ -244,7 +247,7 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 		strings.Contains(s.WorkerConfig.WorkerAddress, fqdn) {
 		dh, _, err := net.SplitHostPort(s.WorkerConfig.WorkerIPPortAddress)
 		if strings.Contains(dh, ":") {
-			// its ipv6
+			// It's IPv6.
 			dh = "[" + dh + "]"
 		}
 		if err != nil {
@@ -299,7 +302,7 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Parse answer and store in cache
+	// Parse answer and store it in the cache
 	answer := exchange.Answer[0]
 	logger.Infof("resolved %s to %s", fqdn, strings.Replace(answer.String(), "\t", " ", -1))
 	record := strings.Fields(answer.String())
