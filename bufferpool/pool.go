@@ -1,3 +1,5 @@
+// Package bufferpool provides a simple buffer pool for getting and returning
+// temporary byte slices for use by io.CopyBuffer.
 package bufferpool
 
 import "sync"
