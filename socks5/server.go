@@ -1,3 +1,6 @@
+// Package socks5 provides a SOCKS5 proxy server implementation with authentication
+// support, request handling, and connection management. It can serve as a proxy for
+// various network applications that support SOCKS5 proxies.
 package socks5
 
 import (
@@ -99,15 +102,18 @@ func (sf *Server) ListenAndServe(network, addr string) error {
 
 	sf.bindAddress = addr
 
+	// Create a custom dialer with DialContext
 	dialer, err := proxy.SOCKS5(network, sf.bindAddress, nil, proxy.Direct)
-
 	if err != nil {
 		return err
 	}
 
-	prx.Tr.Dial = dialer.Dial
+	// Use DialContext from the net package
+	prx.Tr.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return dialer.Dial(network, address)
+	}
 
-	// find a random port and listen to it
+	// Find a random port and listen to it
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return err
@@ -160,6 +166,9 @@ func (sf *Server) Serve() error {
 	}
 }
 
+// Shutdown gracefully stops the SOCKS5 server. It closes the listener and waits
+// for all active connections to complete. This function blocks until the server
+// is completely shut down.
 func (sf *Server) Shutdown() error {
 	go func() { sf.done <- true }() // Shutting down the socks5 proxy
 	err := sf.listen.Close()
@@ -193,10 +202,13 @@ func (sf *Server) ServeConn(conn net.Conn) error {
 func (sf *Server) handleHTTPRequest(conn net.Conn, bufConn *bufio.Reader) error {
 	// redirect http to socks5
 	dstConn, err := net.Dial(sf.listen.Addr().Network(), sf.httpProxyBindAddr)
-	defer dstConn.Close()
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = dstConn.Close() // No need to handle the error if there's no specific action to take.
+	}()
+
 	errChan := make(chan error)
 	go func() {
 		_, err := io.Copy(dstConn, bufConn)
@@ -283,17 +295,17 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 	}
 	command := cddstportdstip[1]
 	dstPort := binary.BigEndian.Uint16(cddstportdstip[2:4])
-	var dstIp net.IP = cddstportdstip[4:]
+	var dstIP net.IP = cddstportdstip[4:] // Change dstIp to dstIP
 	if command != uint8(1) {
 		return fmt.Errorf("command %d is not supported", command)
 	}
-	destination = net.JoinHostPort(dstIp.String(), strconv.Itoa(int(dstPort)))
+	destination = net.JoinHostPort(dstIP.String(), strconv.Itoa(int(dstPort)))
 	// Skip USERID
 	if _, err := readAsString(bufConn); err != nil {
 		return err
 	}
 	// SOCKS4a
-	if dstIp[0] == 0 && dstIp[1] == 0 && dstIp[2] == 0 && dstIp[3] != 0 {
+	if dstIP[0] == 0 && dstIP[1] == 0 && dstIP[2] == 0 && dstIP[3] != 0 { // Change dstIp to dstIP
 		var err error
 		dstHost, err = readAsString(bufConn)
 		if err != nil {

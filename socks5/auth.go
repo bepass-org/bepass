@@ -1,3 +1,6 @@
+// Package socks5 provides functionality for handling SOCKS5 protocol authentication methods.
+// It includes implementations of various authentication mechanisms, such as "No Authentication" and
+// username/password-based authentication.
 package socks5
 
 import (
