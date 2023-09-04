@@ -1,3 +1,4 @@
+// Package protect provides functionality for protecting network connections.
 package protect
 
 import (
