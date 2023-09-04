@@ -1,25 +1,24 @@
-
-## Disclamer
+## Disclaimer
 
 **⚠ WARNING:** **This is an EXPERIMENTAL Project, use it at your own risk!**
 # Bepass: A DPI bypassing tool and Socks over Cloudflare Worker Proxy!
 
-This is a simple tool that utilizes tls client hello splitting attack in order to bypass the iran's dpi system. It won't work if the target machine's ip is blocked(Yet ?!)
+This is a simple tool that utilizes tls client hello splitting attack in order to bypass Iran's DPI system. It won't work if the target machine's IP is blocked(Yet ?!)
 \
 \
-It also allow you to deploy a free and fast vless like proxy in cloudflare workers, just copy the worker.js to your worker and fill configs accordingly it will do the rest
+It also allows you to deploy a free and fast VLESS-like proxy on Cloudflare Workers. Just copy the worker.js to your worker and fill configs accordingly; it will do the rest.
 
 
 
 ## Features
 
-- Supports all Iran's network careers with some tweaks in tls hello packet length
+- Supports all of Iran's network carriers with some tweaks in TLS hello packet length.
 - DOH support
 - SDNS support
-- Cross platform
+- Cross-platform
 
 ## Build (CLI)
-You can build CLI debug and release version as:
+You can build CLI debug and release versions as follows:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
@@ -29,7 +28,7 @@ You can build CLI debug and release version as:
 ```
 
 ## Build (GUI) (WIP)
-You can build GUI debug and release version as:
+You can build GUI debug and release versions as follows:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
@@ -39,7 +38,7 @@ You can build GUI debug and release version as:
 ```
 
 ## Deployment (CLI)
-You can download the latest build from release or Just install go 1.19+ and run:
+You can download the latest build from the release or just install Go 1.19+ and run:
 
 ```bash
   git clone https://github.com/uoosef/bepass.git
@@ -58,7 +57,7 @@ It should give you an executable file, or you can simply run it in place.
 
 ## Usage
 
-In order to deploy this project, you should first find a "DOH" or "SDNS" link that works on your ISP, then edit config.json and fill the "RemoteDNSAddr" field with the dns link that you found!
+In order to deploy this project, you should first find a "DOH" or "SDNS" link that works on your ISP, then edit config.json and fill the "RemoteDNSAddr" field with the DNS link that you found!
 \
 \
 For example, the following configuration will most likely work on IR-MCI:
@@ -80,16 +79,16 @@ For example, the following configuration will most likely work on IR-MCI:
   "WorkerDNSOnly": true
 }
 ```
-If you cant find any working DOH Servers you can deploy worker.js code to your CF worker and change config.json accordingly
+If you can't find any working DOH Servers, you can deploy worker.js code to your CF worker and change config.json accordingly
 \
 \
-If you just want to use the DOH over worker set WorkerDNSOnly, true
+If you just want to use the DOH over the worker set WorkerDNSOnly to true
 ```json
 {
   "WorkerDNSOnly": true
 }
 ```
-But if you want a full-fledged tcp socks5 proxy over worker set WorkerDNSOnly, false. please consider that your udp traffic wouldn't go through worker because cf doesn't support udp outgoing sockets currently
+But if you want a full-fledged TCP SOCKS5 proxy over the worker set WorkerDNSOnly to false. Please consider that your UDP traffic wouldn't go through the worker because CF doesn't support UDP outgoing sockets currently
 ```json
 {
   "WorkerDNSOnly": false
@@ -102,10 +101,9 @@ But if you want a full-fledged tcp socks5 proxy over worker set WorkerDNSOnly, f
 - TCP PROXY Over Worker (DONE)
 - A GUI Version (WIP)
 - An Android version (WIP)
-- Finding a way to bypass the blocked ips
+- Finding a way to bypass the blocked IPs
 
 
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/) go nuts!
-
