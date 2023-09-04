@@ -1,3 +1,5 @@
+// Package sni provides functionality for parsing the first HTTP request on a connection
+// and returning metadata for virtual host muxing.
 package sni
 
 import (
