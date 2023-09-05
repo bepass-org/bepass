@@ -1,3 +1,4 @@
+// Package utils provides utility functions for the application.
 package utils
 
 import (
@@ -6,6 +7,7 @@ import (
 
 var chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-"
 
+// ShortID generates a random short ID of the specified length.
 func ShortID(length int) string {
 	ll := len(chars)
 	b := make([]byte, length)

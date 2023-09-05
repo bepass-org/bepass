@@ -1,3 +1,5 @@
+// Package wsconnadapter provides an adapter for representing WebSocket connections as net.Conn objects.
+// It allows you to use WebSocket connections as if they were standard network connections.
 package wsconnadapter
 
 import (
@@ -9,9 +11,8 @@ import (
 	"time"
 )
 
-// an adapter for representing WebSocket connection as a net.Conn
-// some caveats apply: https://github.com/gorilla/websocket/issues/441
-
+// Adapter represents an adapter for representing WebSocket connection as a net.Conn.
+// Some caveats apply: https://github.com/gorilla/websocket/issues/441
 type Adapter struct {
 	conn       *websocket.Conn
 	readMutex  sync.Mutex
@@ -19,12 +20,14 @@ type Adapter struct {
 	reader     io.Reader
 }
 
+// New creates a new Adapter from a WebSocket connection.
 func New(conn *websocket.Conn) *Adapter {
 	return &Adapter{
 		conn: conn,
 	}
 }
 
+// Read reads data from the WebSocket connection.
 func (a *Adapter) Read(b []byte) (int, error) {
 	// Read() can be called concurrently, and we mutate some internal state here
 	a.readMutex.Lock()
@@ -57,6 +60,7 @@ func (a *Adapter) Read(b []byte) (int, error) {
 	return bytesRead, err
 }
 
+// Write writes data to the WebSocket connection.
 func (a *Adapter) Write(b []byte) (int, error) {
 	a.writeMutex.Lock()
 	defer a.writeMutex.Unlock()
@@ -72,18 +76,22 @@ func (a *Adapter) Write(b []byte) (int, error) {
 	return bytesWritten, err
 }
 
+// Close closes the WebSocket connection.
 func (a *Adapter) Close() error {
 	return a.conn.Close()
 }
 
+// LocalAddr returns the local network address.
 func (a *Adapter) LocalAddr() net.Addr {
 	return a.conn.LocalAddr()
 }
 
+// RemoteAddr returns the remote network address.
 func (a *Adapter) RemoteAddr() net.Addr {
 	return a.conn.RemoteAddr()
 }
 
+// SetDeadline sets the read and write deadlines for the connection.
 func (a *Adapter) SetDeadline(t time.Time) error {
 	if err := a.SetReadDeadline(t); err != nil {
 		return err
@@ -92,10 +100,12 @@ func (a *Adapter) SetDeadline(t time.Time) error {
 	return a.SetWriteDeadline(t)
 }
 
+// SetReadDeadline sets the read deadline for the connection.
 func (a *Adapter) SetReadDeadline(t time.Time) error {
 	return a.conn.SetReadDeadline(t)
 }
 
+// SetWriteDeadline sets the write deadline for the connection.
 func (a *Adapter) SetWriteDeadline(t time.Time) error {
 	return a.conn.SetWriteDeadline(t)
 }

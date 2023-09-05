@@ -1,3 +1,4 @@
+// Package statute provides functionality for handling SOCKS5 protocol messages and addresses.
 package statute
 
 import (

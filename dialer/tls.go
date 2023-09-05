@@ -1,10 +1,13 @@
+// Package dialer provides utilities for creating custom HTTP clients with
+// flexible dialing options.
 package dialer
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	tls "github.com/refraction-networking/utls"
 	"io"
-	"math/rand"
 	"net"
 	"strings"
 )
@@ -37,6 +40,7 @@ type SNIExtension struct {
 	ServerName string // not an array because go crypto/tls doesn't support multiple SNIs
 }
 
+// Len returns the length of the SNIExtension.
 func (e *SNIExtension) Len() int {
 	// Literal IP addresses, absolute FQDNs, and empty strings are not permitted as SNI values.
 	// See RFC 6066, Section 3.
@@ -47,6 +51,7 @@ func (e *SNIExtension) Len() int {
 	return 4 + 2 + 1 + 2 + len(hostName)
 }
 
+// Read reads the SNIExtension.
 func (e *SNIExtension) Read(b []byte) (int, error) {
 	// Literal IP addresses, absolute FQDNs, and empty strings are not permitted as SNI values.
 	// See RFC 6066, Section 3.
@@ -71,20 +76,22 @@ func (e *SNIExtension) Read(b []byte) (int, error) {
 	return e.Len(), io.EOF
 }
 
+// FakePaddingExtension implements padding (0x15) extension
 type FakePaddingExtension struct {
 	*tls.GenericExtension
 	PaddingLen int
 	WillPad    bool // set false to disable extension
 }
 
+// Len returns the length of the FakePaddingExtension.
 func (e *FakePaddingExtension) Len() int {
 	if e.WillPad {
 		return 4 + e.PaddingLen
-	} else {
-		return 0
 	}
+	return 0
 }
 
+// Read reads the FakePaddingExtension.
 func (e *FakePaddingExtension) Read(b []byte) (n int, err error) {
 	if !e.WillPad {
 		return 0, io.EOF
@@ -98,18 +105,32 @@ func (e *FakePaddingExtension) Read(b []byte) (n int, err error) {
 	b[2] = byte(e.PaddingLen >> 8)
 	b[3] = byte(e.PaddingLen)
 	x := make([]byte, e.PaddingLen)
-	rand.Read(x)
+	_, err = rand.Read(x)
+	if err != nil {
+		return 0, err
+	}
 	copy(b[4:], x)
 	return e.Len(), io.EOF
 }
 
+// makeTLSHelloPacketWithPadding creates a TLS hello packet with padding.
 func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.Config, sni string) (*tls.UConn, error) {
 	paddingMax := d.TLSPaddingSize[1]
 	paddingMin := d.TLSPaddingSize[0]
 	paddingSize := paddingMax
 	if paddingMax > paddingMin {
-		paddingSize = rand.Intn(paddingMax-paddingMin) + paddingMin
+		// Generate a random 32-bit integer using crypto/rand
+		randomBytes := make([]byte, 4)
+		_, err := rand.Read(randomBytes)
+		if err != nil {
+			return nil, err
+		}
+		randomInt := int(binary.BigEndian.Uint32(randomBytes))
+
+		// Calculate paddingSize using crypto/rand-generated randomInt
+		paddingSize = randomInt%(paddingMax-paddingMin+1) + paddingMin
 	}
+
 	utlsConn := tls.UClient(plainConn, config, tls.HelloCustom)
 	spec := tls.ClientHelloSpec{
 		TLSVersMax: tls.VersionTLS13,
@@ -166,6 +187,7 @@ func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.C
 	return utlsConn, nil
 }
 
+// TLSDial dials a TLS connection.
 func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort string) (net.Conn, error) {
 	sni, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -185,10 +207,16 @@ func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort strin
 	var utlsConn *tls.UConn
 
 	if d.TLSPaddingEnabled {
-		utlsConn, err = d.makeTLSHelloPacketWithPadding(plainConn, &config, sni)
-	} else {
-		utlsConn = tls.UClient(plainConn, &config, tls.HelloAndroid_11_OkHttp)
+		utlsConn, handshakeErr := d.makeTLSHelloPacketWithPadding(plainConn, &config, sni)
+		if handshakeErr != nil {
+			_ = plainConn.Close()
+			fmt.Println(handshakeErr)
+			return nil, handshakeErr
+		}
+		return utlsConn, nil
 	}
+
+	utlsConn = tls.UClient(plainConn, &config, tls.HelloAndroid_11_OkHttp)
 
 	err = utlsConn.Handshake()
 	if err != nil {

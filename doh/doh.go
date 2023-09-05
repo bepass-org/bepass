@@ -1,3 +1,4 @@
+// Package doh provides a DNS-over-HTTPS (DoH) client implementation.
 package doh
 
 import (
@@ -13,14 +14,17 @@ import (
 	"github.com/miekg/dns"
 )
 
+// ClientOptions represents options for configuring the DNS-over-HTTPS (DoH) client.
 type ClientOptions struct {
-	EnableDNSFragment bool
-	Dialer            *dialer.Dialer
-	LocalResolver     *resolve.LocalResolver
+	EnableDNSFragment bool                   // Enable DNS fragmentation
+	Dialer            *dialer.Dialer         // Custom dialer for HTTP requests
+	LocalResolver     *resolve.LocalResolver // Local DNS resolver
 }
 
+// ClientOption is a function type used for setting client options.
 type ClientOption func(*ClientOptions) error
 
+// WithDialer sets the custom dialer for the DoH client.
 func WithDialer(b *dialer.Dialer) ClientOption {
 	return func(o *ClientOptions) error {
 		o.Dialer = b
@@ -28,6 +32,7 @@ func WithDialer(b *dialer.Dialer) ClientOption {
 	}
 }
 
+// WithDNSFragmentation enables or disables DNS fragmentation for the DoH client.
 func WithDNSFragmentation(f bool) ClientOption {
 	return func(o *ClientOptions) error {
 		o.EnableDNSFragment = f
@@ -35,6 +40,7 @@ func WithDNSFragmentation(f bool) ClientOption {
 	}
 }
 
+// WithLocalResolver sets the local DNS resolver for the DoH client.
 func WithLocalResolver(r *resolve.LocalResolver) ClientOption {
 	return func(o *ClientOptions) error {
 		o.LocalResolver = r
@@ -42,10 +48,12 @@ func WithLocalResolver(r *resolve.LocalResolver) ClientOption {
 	}
 }
 
+// Client represents a DNS-over-HTTPS (DoH) client.
 type Client struct {
 	opt *ClientOptions
 }
 
+// NewClient creates a new DoH client with the provided options.
 func NewClient(opts ...ClientOption) *Client {
 	o := &ClientOptions{}
 	for _, f := range opts {
@@ -56,6 +64,7 @@ func NewClient(opts ...ClientOption) *Client {
 	}
 }
 
+// HTTPClient performs an HTTP GET request to the given address using the configured client.
 func (c *Client) HTTPClient(address string) ([]byte, error) {
 	var client *http.Client
 	if c.opt.EnableDNSFragment {
@@ -86,6 +95,7 @@ func (c *Client) HTTPClient(address string) ([]byte, error) {
 	return content, nil
 }
 
+// Exchange performs a DNS query using DoH to the specified address.
 func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Duration, err error) {
 	var (
 		buf, b64 []byte
@@ -93,7 +103,7 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 		origID   = req.Id
 	)
 
-	// Set DNS ID as zero according to RFC8484 (cache friendly)
+	// Set DNS ID as zero according to RFC8484 (cache-friendly)
 	req.Id = 0
 	buf, err = req.Pack()
 	if err != nil {

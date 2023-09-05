@@ -1,3 +1,4 @@
+// Package statute provides functionality for handling SOCKS5 protocol authentication.
 package statute
 
 import (
@@ -6,6 +7,8 @@ import (
 
 // VersionSocks5 socks5 protocol version
 const VersionSocks5 = byte(0x05)
+
+// VersionSocks4 socks4 protocol version
 const VersionSocks4 = byte(0x04)
 
 // request command defined

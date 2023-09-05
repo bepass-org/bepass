@@ -1,3 +1,4 @@
+// Package transport provides network transport functionality.
 package transport
 
 import (
@@ -14,7 +15,8 @@ import (
 	"strings"
 )
 
-type UdpBind struct {
+// UDPBind represents a UDP binding configuration.
+type UDPBind struct {
 	Source        *net.UDPAddr
 	Destination   string
 	TCPTunnel     *wsconnadapter.Adapter
@@ -25,12 +27,14 @@ type UdpBind struct {
 	RecvChan      chan UDPPacket
 }
 
+// UDPConf represents UDP configuration.
 type UDPConf struct {
 	ReadTimeout     int
 	WriteTimeout    int
 	LinkIdleTimeout int
 }
 
+// Transport represents the transport layer.
 type Transport struct {
 	WorkerAddress string
 	BindAddress   string
@@ -40,11 +44,13 @@ type Transport struct {
 	Tunnel        *WSTunnel
 }
 
+// UDPPacket represents a UDP packet.
 type UDPPacket struct {
 	Channel uint16
 	Data    []byte
 }
 
+// Handle handles network traffic.
 func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) error {
 	// connect to remote server via ws
 	if network == "udp" {
@@ -99,6 +105,7 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 	return err
 }
 
+// Copy copies data from reader to writer.
 func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
 	buf := make([]byte, 32*1024)
 
@@ -106,8 +113,9 @@ func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
 	return err
 }
 
+// TunnelUDP tunnels UDP packets over WebSocket.
 func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
-	udpAddr, err := net.ResolveUDPAddr("udp", t.UDPBind+":0")
+	udpAddr, _ := net.ResolveUDPAddr("udp", t.UDPBind+":0") // Use _ to indicate the error is intentionally ignored
 	// connect to remote server via ws
 	bindLn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
@@ -138,7 +146,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 		return err
 	}
 	// make new Bind
-	udpBind := &UdpBind{
+	udpBind := &UDPBind{
 		SocksWriter:   w,
 		SocksReq:      req,
 		AssociateBind: bindLn,

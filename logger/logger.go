@@ -1,3 +1,4 @@
+// Package logger provides a customizable logging utility.
 package logger
 
 import (
@@ -10,12 +11,16 @@ import (
 	"time"
 )
 
-const (
-	LevelTrace = slog.Level(-6)
-	LevelFatal = slog.Level(10)
-	LevelPanic = slog.Level(12)
-)
+// LevelTrace is the logging level for trace messages.
+const LevelTrace = slog.Level(-6)
 
+// LevelFatal is the logging level for fatal messages.
+const LevelFatal = slog.Level(10)
+
+// LevelPanic is the logging level for panic messages.
+const LevelPanic = slog.Level(12)
+
+// LevelNames maps logging levels to their human-readable names.
 var LevelNames = map[slog.Leveler]string{
 	LevelTrace: "TRACE",
 	LevelFatal: "FATAL",
@@ -62,11 +67,12 @@ func init() {
 	}
 }
 
+// GetLogger returns the global logger instance.
 func GetLogger() *slog.Logger {
 	return logger
 }
 
-func log(ctx context.Context, level slog.Level, msg string, args ...any) {
+func log(ctx context.Context, level slog.Level, msg string, args ...interface{}) {
 	if !logger.Enabled(ctx, level) {
 		return
 	}
@@ -78,7 +84,7 @@ func log(ctx context.Context, level slog.Level, msg string, args ...any) {
 	_ = logger.Handler().Handle(ctx, r)
 }
 
-func logf(ctx context.Context, level slog.Level, format string, args ...any) {
+func logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
 	if !logger.Enabled(ctx, level) {
 		return
 	}
@@ -89,66 +95,81 @@ func logf(ctx context.Context, level slog.Level, format string, args ...any) {
 	_ = logger.Handler().Handle(ctx, r)
 }
 
-func Error(msg string, args ...any) {
+// Error logs an error message.
+func Error(msg string, args ...interface{}) {
 	log(context.Background(), slog.LevelError, msg, args...)
 }
 
-func Errorf(format string, args ...any) {
+// Errorf logs a formatted error message.
+func Errorf(format string, args ...interface{}) {
 	logf(context.Background(), slog.LevelError, format, args...)
 }
 
-func ErrorContext(ctx context.Context, msg string, args ...any) {
+// ErrorContext logs an error message within a specified context.
+func ErrorContext(ctx context.Context, msg string, args ...interface{}) {
 	log(ctx, slog.LevelError, msg, args...)
 }
 
-func Info(msg string, args ...any) {
+// Info logs an informational message.
+func Info(msg string, args ...interface{}) {
 	log(context.Background(), slog.LevelInfo, msg, args...)
 }
 
-func Infof(format string, args ...any) {
+// Infof logs a formatted informational message.
+func Infof(format string, args ...interface{}) {
 	logf(context.Background(), slog.LevelInfo, format, args...)
 }
 
-func Warn(msg string, args ...any) {
+// Warn logs a warning message.
+func Warn(msg string, args ...interface{}) {
 	log(context.Background(), slog.LevelWarn, msg, args...)
 }
 
-func Warnf(format string, args ...any) {
+// Warnf logs a formatted warning message.
+func Warnf(format string, args ...interface{}) {
 	logf(context.Background(), slog.LevelWarn, format, args...)
 }
 
-func Debug(msg string, args ...any) {
+// Debug logs a debug message.
+func Debug(msg string, args ...interface{}) {
 	log(context.Background(), slog.LevelDebug, msg, args...)
 }
 
-func Debugf(format string, args ...any) {
+// Debugf logs a formatted debug message.
+func Debugf(format string, args ...interface{}) {
 	logf(context.Background(), slog.LevelDebug, format, args...)
 }
 
-func Trace(msg string, args ...any) {
+// Trace logs a trace message.
+func Trace(msg string, args ...interface{}) {
 	log(context.Background(), LevelTrace, msg, args...)
 }
 
-func Tracef(format string, args ...any) {
+// Tracef logs a formatted trace message.
+func Tracef(format string, args ...interface{}) {
 	logf(context.Background(), LevelTrace, format, args...)
 }
 
-func Fatal(msg string, args ...any) {
+// Fatal logs a fatal message and exits the program with status code 1.
+func Fatal(msg string, args ...interface{}) {
 	log(context.Background(), LevelFatal, msg, args...)
 	os.Exit(1)
 }
 
-func Fatalf(format string, args ...any) {
+// Fatalf logs a formatted fatal message and exits the program with status code 1.
+func Fatalf(format string, args ...interface{}) {
 	logf(context.Background(), LevelFatal, format, args...)
 	os.Exit(1)
 }
 
-func Panic(msg string, args ...any) {
+// Panic logs a panic message and panics.
+func Panic(msg string, args ...interface{}) {
 	log(context.Background(), LevelPanic, msg, args...)
 	panic(msg)
 }
 
-func Panicf(format string, args ...any) {
+// Panicf logs a formatted panic message and panics.
+func Panicf(format string, args ...interface{}) {
 	logf(context.Background(), LevelPanic, format, args...)
 	panic(fmt.Sprintf(format, args...))
 }

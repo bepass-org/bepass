@@ -1,3 +1,4 @@
+// Package sni provides functionality for handling Server Name Indication (SNI) in TLS connections.
 package sni
 
 import (
@@ -24,7 +25,7 @@ const (
 
 // TLS extension numbers
 var (
-	extensionServerName      uint16 = 0
+	extensionServerName      uint16
 	extensionStatusRequest   uint16 = 5
 	extensionSupportedCurves uint16 = 10
 	extensionSupportedPoints uint16 = 11
@@ -202,11 +203,14 @@ func ReadClientHello(rd io.Reader) (*ClientHelloMsg, error) {
 	return msg, nil
 }
 
+// ClientHelloMsg represents a TLS ClientHello message. It contains various fields
+// that store information about the client's hello message during a TLS handshake.
 type ClientHelloMsg struct {
+	// Raw contains the raw bytes of the ClientHello message.
 	Raw                []byte
 	Versions           uint16
 	Random             []byte
-	SessionId          []byte
+	SessionID          []byte
 	CipherSuites       []uint16
 	CompressionMethods []uint8
 	NextProtoNeg       bool
@@ -225,12 +229,12 @@ func (m *ClientHelloMsg) unmarshal(data []byte) bool {
 	m.Raw = data
 	m.Versions = uint16(data[4])<<8 | uint16(data[5])
 	m.Random = data[6:38]
-	sessionIdLen := int(data[38])
-	if sessionIdLen > 32 || len(data) < 39+sessionIdLen {
+	sessionIDLen := int(data[38])
+	if sessionIDLen > 32 || len(data) < 39+sessionIDLen {
 		return false
 	}
-	m.SessionId = data[39 : 39+sessionIdLen]
-	data = data[39+sessionIdLen:]
+	m.SessionID = data[39 : 39+sessionIDLen]
+	data = data[39+sessionIDLen:]
 	if len(data) < 2 {
 		return false
 	}
