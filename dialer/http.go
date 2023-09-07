@@ -1,3 +1,5 @@
+// Package dialer provides utilities for creating custom HTTP clients with
+// flexible dialing options.
 package dialer
 
 import (
@@ -7,6 +9,7 @@ import (
 	"net/url"
 )
 
+// MakeHTTPClient creates an HTTP client with custom dialing behavior.
 func (d *Dialer) MakeHTTPClient(hostPort string, enableProxy bool) *http.Client {
 	transport := &http.Transport{
 		ForceAttemptHTTP2: false,
@@ -20,10 +23,10 @@ func (d *Dialer) MakeHTTPClient(hostPort string, enableProxy bool) *http.Client 
 		},
 	}
 	if enableProxy {
-		proxyUrl, _ := url.Parse(d.ProxyAddress)
+		proxyURL, _ := url.Parse(d.ProxyAddress)
 
 		// Create dialer
-		transport.Proxy = http.ProxyURL(proxyUrl)
+		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 	return &http.Client{Transport: transport}
 }

@@ -1,3 +1,5 @@
+// Package dialer provides utilities for creating custom HTTP clients with
+// flexible dialing options.
 package dialer
 
 import (

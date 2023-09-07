@@ -1,3 +1,6 @@
+// Package socks5 provides functionality for handling SOCKS5 protocol requests and
+// implementing various SOCKS5 proxy server features, including authentication,
+// command handling (e.g., Connect, Bind, Associate), and data forwarding.
 package socks5
 
 import (
@@ -16,24 +19,25 @@ type AddressRewriter interface {
 	Rewrite(ctx context.Context, request *Request) (context.Context, *statute.AddrSpec)
 }
 
-// A Request represents request received by a server
+// A Request represents a request received by a server, including authentication
+// details, addresses, and connection information.
 type Request struct {
 	statute.Request
 	// AuthContext provided during negotiation
 	AuthContext *AuthContext
-	// LocalAddr of the the network server listen
+	// LocalAddr of the network server listener
 	LocalAddr net.Addr
-	// RemoteAddr of the the network that sent the request
+	// RemoteAddr of the network that sent the request
 	RemoteAddr net.Addr
 	// DestAddr of the actual destination (might be affected by rewrite)
 	DestAddr *statute.AddrSpec
-	// Reader connect of request
+	// Reader for the request's data
 	Reader io.Reader
 	// RawDestAddr of the desired destination
 	RawDestAddr *statute.AddrSpec
 }
 
-// ParseRequest creates a new Request from the tcp connection
+// ParseRequest creates a new Request from the TCP connection
 func ParseRequest(bufConn io.Reader) (*Request, error) {
 	hd, err := statute.ParseRequest(bufConn)
 	if err != nil {

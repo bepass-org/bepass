@@ -1,3 +1,4 @@
+// Package utils provides utility functions for the application.
 package utils
 
 import (
@@ -7,6 +8,7 @@ import (
 	"strings"
 )
 
+// WSEndpointHelper generates a WebSocket endpoint URL based on the workerAddress, rawDestAddress, and network.
 func WSEndpointHelper(workerAddress, rawDestAddress, network string) (string, error) {
 	u, err := url.Parse(workerAddress)
 	if err != nil {
