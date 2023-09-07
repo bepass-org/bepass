@@ -185,6 +185,12 @@ func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.C
 		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
 	}
 
+	err = utlsConn.Handshake()
+
+	if err != nil {
+		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
+	}
+
 	return utlsConn, nil
 }
 
