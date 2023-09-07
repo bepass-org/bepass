@@ -39,7 +39,6 @@ func main() {
 	}
 
 	// Run the server with the loaded configuration
-	fmt.Printf("Config: %+v\n", config)
 	err = core.RunServer(config, true)
 	if err != nil {
 		logger.Fatal("", err)
