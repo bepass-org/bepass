@@ -50,10 +50,6 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 	if network == "udp" {
 		return t.TunnelUDP(w, req)
 	}
-	if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
-		logger.Errorf("failed to send reply: %v", err)
-		return err
-	}
 
 	tunnelEndpoint, err := utils.WSEndpointHelper(t.WorkerAddress, req.RawDestAddr.String(), network)
 	if err != nil {
@@ -74,29 +70,27 @@ func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) err
 	}
 
 	conn := wsconnadapter.New(wsConn)
+	defer conn.Close()
 
 	if err != nil {
 		return err
 	}
 
+	// flush ws stream to write
+	conn.Write([]byte{})
+
 	errCh := make(chan error, 2)
-
-	// upload path
 	go func() { errCh <- t.Copy(req.Reader, conn) }()
-
-	// download path
 	go func() { errCh <- t.Copy(conn, w) }()
-
 	// Wait
-	err = <-errCh
-	if err != nil &&
-		(!strings.Contains(err.Error(), "websocket: close 1006") ||
-			!strings.Contains(err.Error(), "websocket: close 1005")) {
-		fmt.Println("Transport error:", err)
+	for i := 0; i < 2; i++ {
+		e := <-errCh
+		if e != nil {
+			// return from this function closes target (and conn).
+			return e
+		}
 	}
-
-	_ = conn.Close()
-	return err
+	return nil
 }
 
 func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
