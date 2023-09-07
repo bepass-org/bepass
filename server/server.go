@@ -131,7 +131,7 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
 func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, network string) error {
 	if s.WorkerConfig.WorkerEnabled && !s.WorkerConfig.WorkerDNSOnly && network == "udp" {
-		return s.Transport.Handle(network, w, req)
+		return s.Transport.TunnelUDP(w, req)
 	}
 
 	if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
@@ -178,7 +178,7 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 			BufReader:       req.Reader,
 			FirstTime:       true,
 		}
-		return s.Transport.Handle(network, w, req)
+		return s.Transport.TunnelTCP(w, req)
 	}
 
 	firstPacketChunks := make(map[int][]byte)

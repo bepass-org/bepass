@@ -50,14 +50,9 @@ type UDPPacket struct {
 	Data    []byte
 }
 
-// Handle handles network traffic.
-func (t *Transport) Handle(network string, w io.Writer, req *socks5.Request) error {
-	// connect to remote server via ws
-	if network == "udp" {
-		return t.TunnelUDP(w, req)
-	}
-
-	tunnelEndpoint, err := utils.WSEndpointHelper(t.WorkerAddress, req.RawDestAddr.String(), network)
+// TunnelTCP handles tcp network traffic.
+func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
+	tunnelEndpoint, err := utils.WSEndpointHelper(t.WorkerAddress, req.RawDestAddr.String(), "tcp")
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
