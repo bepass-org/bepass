@@ -55,7 +55,6 @@ func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 			}, network, addr, "")
 		},
 	}
-
 	conn, _, err := d.Dial(endpoint, nil)
 	return conn, err
 }

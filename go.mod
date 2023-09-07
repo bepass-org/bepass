@@ -12,7 +12,7 @@ require (
 	github.com/eycorsican/go-tun2socks v0.0.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/miekg/dns v1.1.55
-	github.com/refraction-networking/utls v1.4.3
+	github.com/refraction-networking/utls v1.3.2
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
@@ -51,7 +51,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/quic-go/quic-go v0.37.4 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect

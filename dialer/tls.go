@@ -3,12 +3,13 @@
 package dialer
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	tls "github.com/refraction-networking/utls"
 	"io"
+	"math/rand"
 	"net"
+	"slices"
 	"strings"
 )
 
@@ -187,6 +188,21 @@ func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.C
 	return utlsConn, nil
 }
 
+func removeProtocolFromALPN(spec *tls.ClientHelloSpec, protocol string) *tls.ClientHelloSpec {
+	alpnExtIndex := slices.IndexFunc(spec.Extensions, func(ext tls.TLSExtension) bool {
+		_, ok := ext.(*tls.ALPNExtension)
+		return ok
+	})
+	if alpnExtIndex == -1 {
+		return spec
+	}
+
+	alpnExt := spec.Extensions[alpnExtIndex].(*tls.ALPNExtension)
+	alpnExt.AlpnProtocols = slices.DeleteFunc(alpnExt.AlpnProtocols, func(p string) bool { return p == protocol })
+
+	return spec
+}
+
 // TLSDial dials a TLS connection.
 func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort string) (net.Conn, error) {
 	sni, _, err := net.SplitHostPort(addr)
@@ -197,14 +213,26 @@ func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort strin
 	if err != nil {
 		return nil, err
 	}
+
+	var randomFingerprint tls.ClientHelloID
+
+	modernFingerprints := []tls.ClientHelloID{
+		tls.HelloChrome_Auto,
+		tls.HelloFirefox_Auto,
+		tls.HelloEdge_Auto,
+		tls.HelloSafari_Auto,
+		tls.HelloIOS_Auto,
+	}
+	randomFingerprint = modernFingerprints[rand.Intn(len(modernFingerprints))]
+
 	config := tls.Config{
 		ServerName:         sni,
 		InsecureSkipVerify: true,
-		NextProtos:         []string{"http/1.1"},
+		NextProtos:         nil,
 		MinVersion:         tls.VersionTLS10,
 	}
 
-	var utlsConn *tls.UConn
+	var utlsClient *tls.UConn
 
 	if d.TLSPaddingEnabled {
 		utlsConn, handshakeErr := d.makeTLSHelloPacketWithPadding(plainConn, &config, sni)
@@ -216,13 +244,20 @@ func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort strin
 		return utlsConn, nil
 	}
 
-	utlsConn = tls.UClient(plainConn, &config, tls.HelloAndroid_11_OkHttp)
+	utlsClient = tls.UClient(plainConn, &config, tls.HelloCustom)
 
-	err = utlsConn.Handshake()
+	spec, _ := tls.UTLSIdToSpec(randomFingerprint)
+
+	err = utlsClient.ApplyPreset(removeProtocolFromALPN(&spec, "h2"))
+	if err != nil {
+		return nil, err
+	}
+
+	err = utlsClient.Handshake()
 	if err != nil {
 		_ = plainConn.Close()
 		fmt.Println(err)
 		return nil, err
 	}
-	return utlsConn, nil
+	return utlsClient, nil
 }
