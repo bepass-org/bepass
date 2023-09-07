@@ -12,7 +12,6 @@ import (
 	"bepass/utils"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -20,7 +19,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ameshkov/dnscrypt/v2"
@@ -58,32 +56,26 @@ type Server struct {
 	Transport             *transport.Transport
 }
 
-// getHostname This function extracts the tls sni or http
-func (s *Server) getHostname(data []byte) ([]byte, []byte, error) {
+// extractHostnameOrChangeHTTPHostHeader This function extracts the tls sni or http
+func (s *Server) extractHostnameOrChangeHTTPHostHeader(data []byte) (
+	hostname []byte, firstPacketData []byte, isHTTP bool, err error) {
 	hello, err := sni.ReadClientHello(bytes.NewReader(data))
 	if err != nil {
-		host, data_, err := sni.ParseHTTPHost(bytes.NewReader(data))
+		host, httpPacketData, err := sni.ParseHTTPHost(bytes.NewReader(data))
 		if err != nil {
-			return nil, data, err
+			return nil, data, false, err
 		}
-		return []byte(host), data_, errors.New("http request packet")
+		return []byte(host), httpPacketData, true, nil
 	}
-	return []byte(hello.ServerName), data, nil
+	return []byte(hello.ServerName), data, false, nil
 }
 
-func (s *Server) getChunkedPackets(data []byte) (chunks map[int][]byte, host []byte) {
-	chunks = make(map[int][]byte)
-	host, data_, err := s.getHostname(data)
-	if host != nil {
-		logger.Infof("Hostname %s", string(host))
-	}
-	if err != nil {
-		chunks[0] = data_
-		return
-	}
+func (s *Server) getChunkedPackets(data []byte, host []byte) map[int][]byte {
+	chunks := make(map[int][]byte)
 	index := bytes.Index(data, host)
 	if index == -1 {
-		return nil, nil
+		chunks[0] = data
+		return chunks
 	}
 	// before sni
 	chunks[0] = make([]byte, index)
@@ -94,7 +86,7 @@ func (s *Server) getChunkedPackets(data []byte) (chunks map[int][]byte, host []b
 	// after sni
 	chunks[2] = make([]byte, len(data)-index-len(host))
 	copy(chunks[2], data[index+len(host):])
-	return
+	return chunks
 }
 
 func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
@@ -138,16 +130,8 @@ func (s *Server) sendSplitChunks(dst io.Writer, chunks map[int][]byte) {
 
 // Handle handles the SOCKS5 request and forwards traffic to the destination.
 func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, network string) error {
-	if s.WorkerConfig.WorkerEnabled &&
-		!s.WorkerConfig.WorkerDNSOnly &&
-		(network == "udp" || !strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
-
+	if s.WorkerConfig.WorkerEnabled && !s.WorkerConfig.WorkerDNSOnly && network == "udp" {
 		return s.Transport.Handle(network, w, req)
-	}
-
-	IPPort, err := s.resolveDestination(ctx, req)
-	if err != nil {
-		return err
 	}
 
 	if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
@@ -161,7 +145,16 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 		return err
 	}
 
-	firstPacketChunks, hostname := s.getChunkedPackets(firstPacket[:read])
+	hostname, firstPacketData, isHTTP, err := s.extractHostnameOrChangeHTTPHostHeader(firstPacket[:read])
+
+	if hostname != nil {
+		logger.Infof("Hostname %s", string(hostname))
+	}
+
+	IPPort, err := s.resolveDestination(ctx, req)
+	if err != nil {
+		return err
+	}
 
 	// if user has a faulty dns, and it returns dpi ip,
 	// we resolve destination based on extracted tls sni or http hostname
@@ -175,6 +168,25 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 			logger.Infof("system was unable to extract destination host from packets!")
 			return err
 		}
+	}
+
+	if s.WorkerConfig.WorkerEnabled &&
+		!s.WorkerConfig.WorkerDNSOnly &&
+		(!strings.Contains(s.WorkerConfig.WorkerAddress, req.DstAddr.FQDN) || strings.TrimSpace(req.DstAddr.FQDN) == "") {
+		req.Reader = &utils.BufferedReader{
+			FirstPacketData: firstPacketData,
+			BufReader:       req.Reader,
+			FirstTime:       true,
+		}
+		return s.Transport.Handle(network, w, req)
+	}
+
+	firstPacketChunks := make(map[int][]byte)
+
+	if isHTTP || err != nil || hostname == nil {
+		firstPacketChunks[0] = firstPacketData
+	} else {
+		firstPacketChunks = s.getChunkedPackets(firstPacketData, hostname)
 	}
 
 	logger.Infof("Dialing %s...", IPPort)
@@ -193,33 +205,28 @@ func (s *Server) Handle(ctx context.Context, w io.Writer, req *socks5.Request, n
 	// writing first packet
 	s.sendSplitChunks(conn, firstPacketChunks)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-	closeSignal := make(chan error, 1)
-
-	go func() {
-		_, err := io.Copy(conn, req.Reader)
-		if err != nil {
-			wg.Done()
+	// Start proxying
+	errCh := make(chan error, 2)
+	go func() { errCh <- s.Copy(req.Reader, conn) }()
+	go func() { errCh <- s.Copy(conn, w) }()
+	// Wait
+	for i := 0; i < 2; i++ {
+		e := <-errCh
+		if e != nil {
+			// return from this function closes target (and conn).
+			return e
 		}
-	}()
-
-	go func() {
-		_, err := io.Copy(w, conn)
-		if err != nil {
-			wg.Done()
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(closeSignal)
-	}()
-
-	return <-closeSignal
+	}
+	return nil
 }
 
-// resolveDestination resolves the destination address using DNS.
+func (s *Server) Copy(reader io.Reader, writer io.Writer) error {
+	buf := make([]byte, 32*1024)
+
+	_, err := io.CopyBuffer(writer, reader, buf[:cap(buf)])
+	return err
+}
+
 func (s *Server) resolveDestination(ctx context.Context, req *socks5.Request) (string, error) {
 	dest := req.RawDestAddr
 
