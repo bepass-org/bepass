@@ -1,6 +1,7 @@
 package tun2socks
 
 import (
+	"bepass/config"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,18 +19,18 @@ import (
 	"github.com/eycorsican/go-tun2socks/core"
 	"github.com/eycorsican/go-tun2socks/proxy/socks"
 
-	bepassCore "bepass/cmd/core"
+	bepassCore "bepass/server"
 
 	"github.com/songgao/water"
 )
 
 func StartClient(cfg string) bool {
-	config := &bepassCore.Config{}
+	config := &config.Config{}
 	err := json.Unmarshal([]byte(cfg), config)
 	if err != nil {
 		return false
 	}
-	err = bepassCore.RunServer(config, false)
+	err = bepassCore.Run(false)
 	if err != nil {
 		return false
 	}

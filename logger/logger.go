@@ -67,11 +67,6 @@ func init() {
 	}
 }
 
-// GetLogger returns the global logger instance.
-func GetLogger() *slog.Logger {
-	return logger
-}
-
 func log(ctx context.Context, level slog.Level, msg string, args ...interface{}) {
 	if !logger.Enabled(ctx, level) {
 		return

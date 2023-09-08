@@ -1,6 +1,6 @@
-// Package wsconnadapter provides an adapter for representing WebSocket connections as net.Conn objects.
+// Package ws provides an adapter for representing WebSocket connections as net.Conn objects.
 // It allows you to use WebSocket connections as if they were standard network connections.
-package wsconnadapter
+package ws
 
 import (
 	"errors"

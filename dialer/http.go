@@ -14,12 +14,12 @@ func (d *Dialer) MakeHTTPClient(hostPort string, enableProxy bool) *http.Client 
 	transport := &http.Transport{
 		ForceAttemptHTTP2: false,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return d.TCPDial(network, addr, hostPort)
+			return d.TCPDial(network, addr)
 		},
 		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return d.TLSDial(func(network, addr, hostPort string) (net.Conn, error) {
-				return d.TCPDial(network, addr, hostPort)
-			}, network, addr, hostPort)
+			return d.TLSDial(func(network, addr string) (net.Conn, error) {
+				return d.TCPDial(network, addr)
+			}, network, addr)
 		},
 	}
 	if enableProxy {

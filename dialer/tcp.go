@@ -11,16 +11,12 @@ import (
 )
 
 // TCPDial connects to the destination address.
-func (d *Dialer) TCPDial(network, addr, hostPort string) (*net.TCPConn, error) {
+func (d *Dialer) TCPDial(network, addr string) (*net.TCPConn, error) {
 	var (
 		tcpAddr *net.TCPAddr
 		err     error
 	)
-	if hostPort != "" {
-		tcpAddr, err = net.ResolveTCPAddr(network, hostPort)
-	} else {
-		tcpAddr, err = net.ResolveTCPAddr(network, addr)
-	}
+	tcpAddr, err = net.ResolveTCPAddr(network, addr)
 	if err != nil {
 		return nil, err
 	}

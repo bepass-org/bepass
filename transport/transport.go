@@ -5,10 +5,10 @@ import (
 	"bepass/bufferpool"
 	"bepass/dialer"
 	"bepass/logger"
+	"bepass/net/adapter/ws"
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bepass/utils"
-	"bepass/wsconnadapter"
 	"fmt"
 	"io"
 	"net"
@@ -19,7 +19,7 @@ import (
 type UDPBind struct {
 	Source        *net.UDPAddr
 	Destination   string
-	TCPTunnel     *wsconnadapter.Adapter
+	TCPTunnel     *ws.Adapter
 	TunnelStatus  bool
 	SocksWriter   io.Writer
 	SocksReq      *socks5.Request
@@ -70,8 +70,10 @@ func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
 		return err
 	}
 
-	conn := wsconnadapter.New(wsConn)
-	defer conn.Close()
+	conn := ws.New(wsConn)
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	if err != nil {
 		return err
@@ -80,16 +82,14 @@ func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
 	// flush ws stream to write
 	conn.Write([]byte{})
 
-	errCh := make(chan error, 2)
+	errCh := make(chan error)
 	go func() { errCh <- t.Copy(req.Reader, conn) }()
 	go func() { errCh <- t.Copy(conn, w) }()
 	// Wait
-	for i := 0; i < 2; i++ {
-		e := <-errCh
-		if e != nil {
-			// return from this function closes target (and conn).
-			return e
-		}
+	e := <-errCh
+	if e != nil {
+		// return from this function closes target (and conn).
+		return e
 	}
 	return nil
 }

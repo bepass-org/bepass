@@ -1,7 +1,8 @@
 package main
 
 import (
-	"bepass/cmd/core"
+	"bepass/config"
+	"bepass/server"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,7 +49,7 @@ type UIComponents struct {
 	openFileButton *widget.Button
 	connectButton  *widget.Button
 	isConnected    bool
-	coreConfig     *core.Config
+	coreConfig     *config.Config
 }
 
 func createUIComponents(myWindow *fyne.Window) *UIComponents {
@@ -132,7 +133,7 @@ func (ui *UIComponents) Connect(myWindow *fyne.Window) {
 		firstValue := ui.dohInput.Text
 		secondValue := ui.listenInput.Text
 
-		ui.coreConfig = &core.Config{
+		ui.coreConfig = &config.Config{
 			TLSHeaderLength:       5,
 			DnsCacheTTL:           3600,
 			WorkerAddress:         "worker.example.com",
@@ -146,7 +147,6 @@ func (ui *UIComponents) Connect(myWindow *fyne.Window) {
 			ChunksLengthAfterSni:  [2]int{50, 60},
 			DelayBetweenChunks:    [2]int{70, 80},
 			ResolveSystem:         "doh",
-			DoHClient:             nil, // Initialize appropriately
 		}
 	}
 
@@ -156,7 +156,7 @@ func (ui *UIComponents) Connect(myWindow *fyne.Window) {
 	}
 
 	go func() {
-		err := core.RunServer(ui.coreConfig, true)
+		err := server.Run(true)
 		if err != nil {
 			dialog.ShowError(err, *myWindow)
 			ui.isConnected = false
@@ -175,7 +175,7 @@ func (ui *UIComponents) Connect(myWindow *fyne.Window) {
 func (ui *UIComponents) Disconnect(myWindow *fyne.Window) {
 	go func() {
 		if ui.coreConfig != nil {
-			err := core.ShutDown()
+			err := server.ShutDown()
 
 			if err != nil {
 				dialog.ShowError(err, *myWindow)

@@ -17,13 +17,11 @@ func TestDialerAndTCPDial(t *testing.T) {
 	testCases := []struct {
 		network  string
 		addr     string
-		hostPort string
 		expected error
 	}{
 		{
 			network:  "tcp",
 			addr:     "example.com:80",
-			hostPort: "",
 			expected: nil, // Modify this based on your expected outcome
 		},
 		// Add more test cases here
@@ -32,7 +30,7 @@ func TestDialerAndTCPDial(t *testing.T) {
 	// Run the test cases
 	for _, tc := range testCases {
 		t.Run(tc.addr, func(t *testing.T) {
-			conn, err := d.TCPDial(tc.network, tc.addr, tc.hostPort)
+			conn, err := d.TCPDial(tc.network, tc.addr)
 			if err != nil {
 				t.Fatalf("TCPDial failed: %v", err)
 			}

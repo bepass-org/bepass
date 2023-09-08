@@ -210,12 +210,12 @@ func removeProtocolFromALPN(spec *tls.ClientHelloSpec, protocol string) *tls.Cli
 }
 
 // TLSDial dials a TLS connection.
-func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr, hostPort string) (net.Conn, error) {
+func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr string) (net.Conn, error) {
 	sni, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
 	}
-	plainConn, err := plainDialer(network, addr, hostPort)
+	plainConn, err := plainDialer(network, addr)
 	if err != nil {
 		return nil, err
 	}

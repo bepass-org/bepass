@@ -2,9 +2,10 @@
 package transport
 
 import (
+	"bepass/config"
 	"bepass/dialer"
 	"bepass/logger"
-	"bepass/wsconnadapter"
+	"bepass/net/adapter/ws"
 	"context"
 	"encoding/binary"
 	"net"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"golang.org/x/net/proxy"
 )
 
 // EstablishedTunnel represents an established tunnel.
@@ -33,26 +33,17 @@ type WSTunnel struct {
 	ShortClientID      string
 }
 
-// socks5TCPDial dials using SOCKS5 proxy.
-func (w *WSTunnel) socks5TCPDial(_ context.Context, network, addr string) (net.Conn, error) {
-	d, err := proxy.SOCKS5("tcp", w.BindAddress, nil, proxy.Direct)
-	if err != nil {
-		return nil, err
-	}
-	return d.Dial(network, addr)
-}
-
 // Dial establishes a WebSocket connection.
 func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	d := websocket.Dialer{
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return w.socks5TCPDial(ctx, network, addr)
+			return w.Dialer.HttpDial(network, config.G.WorkerIPPortAddress)
 		},
 
 		NetDialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return w.Dialer.TLSDial(func(network, addr, hostPort string) (net.Conn, error) {
-				return w.socks5TCPDial(ctx, network, addr)
-			}, network, addr, "")
+			return w.Dialer.TLSDial(func(network, addr string) (net.Conn, error) {
+				return w.Dialer.FragmentDial(network, config.G.WorkerIPPortAddress)
+			}, network, addr)
 		},
 	}
 	conn, _, err := d.Dial(endpoint, nil)
@@ -91,7 +82,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 			logger.Infof("connecting to %s\r\n", tunnelEndpoint)
 
 			c, err := w.Dial(tunnelEndpoint)
-			conn := wsconnadapter.New(c)
+			conn := ws.New(c)
 
 			if err != nil {
 				logger.Errorf("error dialing udp over tcp tunnel: %v\r\n", err)

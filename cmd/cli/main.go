@@ -2,8 +2,9 @@
 package main
 
 import (
-	"bepass/cmd/core"
+	"bepass/config"
 	"bepass/logger"
+	"bepass/server"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,47 +26,46 @@ func main() {
 	err := ff.Parse(fs, os.Args[1:])
 	switch {
 	case errors.Is(err, ff.ErrHelp):
-		fmt.Fprintf(os.Stderr, "%s\n", ffhelp.Flags(fs))
+		logger.Errorf("%s\n", ffhelp.Flags(fs))
 		os.Exit(0)
 	case err != nil:
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		logger.Errorf("error: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Load and validate configuration from JSON file
-	config, err := loadConfig(configPath)
+	err = loadConfig(configPath)
 	if err != nil {
 		logger.Fatal("", err)
 	}
 
 	// Run the server with the loaded configuration
-	err = core.RunServer(config, true)
+	err = server.Run(true)
 	if err != nil {
 		logger.Fatal("", err)
 	}
 
-	// Handle graceful shutdown
+	// HandleTCPTunnel graceful shutdown
 	handleShutdown()
 }
 
-func loadConfig(configPath string) (*core.Config, error) {
+func loadConfig(configPath string) error {
 	file, err := os.Open(configPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
-	config := &core.Config{}
 	decoder := json.NewDecoder(file)
-	err = decoder.Decode(config)
+	err = decoder.Decode(config.G)
 	if err != nil {
 		if strings.Contains(err.Error(), "invalid character") {
-			return nil, fmt.Errorf("configuration file is not valid JSON")
+			return fmt.Errorf("configuration file is not valid JSON")
 		}
-		return nil, err
+		return err
 	}
 
-	return config, nil
+	return nil
 }
 
 func handleShutdown() {
