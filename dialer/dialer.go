@@ -23,11 +23,19 @@ func (d *Dialer) FragmentDial(network, addr string) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = tcpConn.SetNoDelay(true)
+	if err != nil {
+		return nil, err
+	}
 	return fragment.New(tcpConn), nil
 }
 
 func (d *Dialer) HttpDial(network, addr string) (net.Conn, error) {
 	tcpConn, err := d.TCPDial(network, addr)
+	if err != nil {
+		return nil, err
+	}
+	err = tcpConn.SetNoDelay(true)
 	if err != nil {
 		return nil, err
 	}
