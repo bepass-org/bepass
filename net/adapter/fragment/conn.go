@@ -39,6 +39,7 @@ func New(conn net.Conn) *Adapter {
 		BSL:          config.G.ChunksLengthBeforeSni,
 		SL:           config.G.SniChunksLength,
 		ASL:          config.G.ChunksLengthBeforeSni,
+		Delay:        config.G.DelayBetweenChunks,
 	}
 }
 
