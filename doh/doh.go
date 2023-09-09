@@ -2,13 +2,13 @@
 package doh
 
 import (
+	"bepass/config"
 	"bepass/dialer"
 	"bepass/resolve"
 	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/miekg/dns"
@@ -66,17 +66,7 @@ func NewClient(opts ...ClientOption) *Client {
 
 // HTTPClient performs an HTTP GET request to the given address using the configured client.
 func (c *Client) HTTPClient(address string) ([]byte, error) {
-	var client *http.Client
-	if c.opt.EnableDNSFragment {
-		client = c.opt.Dialer.MakeHTTPClient("", true)
-	} else {
-		u, err := url.Parse(address)
-		if err != nil {
-			return nil, err
-		}
-		dohIP := c.opt.LocalResolver.Resolve(u.Hostname())
-		client = c.opt.Dialer.MakeHTTPClient(dohIP+":443", false)
-	}
+	client := c.opt.Dialer.MakeHTTPClient(config.G.WorkerEnabled)
 	resp, err := client.Get(address)
 	if err != nil {
 		return nil, err
@@ -111,6 +101,10 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 	}
 	b64 = make([]byte, base64.RawURLEncoding.EncodedLen(len(buf)))
 	base64.RawURLEncoding.Encode(b64, buf)
+
+	if config.G.WorkerEnabled {
+		address = "https://8.8.8.8/dns-query"
+	}
 
 	content, err := c.HTTPClient(address + "?dns=" + string(b64))
 	if err != nil {

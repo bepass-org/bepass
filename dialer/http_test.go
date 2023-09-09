@@ -21,7 +21,7 @@ func TestMakeHTTPClient(t *testing.T) {
 	}
 
 	// Create an HTTP client using the MakeHTTPClient method
-	client := d.MakeHTTPClient(testServer.Listener.Addr().String(), false)
+	client := d.MakeHTTPClient(false)
 
 	// Make an HTTP request using the client
 	resp, err := client.Get(testServer.URL)

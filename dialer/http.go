@@ -10,7 +10,7 @@ import (
 )
 
 // MakeHTTPClient creates an HTTP client with custom dialing behavior.
-func (d *Dialer) MakeHTTPClient(hostPort string, enableProxy bool) *http.Client {
+func (d *Dialer) MakeHTTPClient(enableProxy bool) *http.Client {
 	transport := &http.Transport{
 		ForceAttemptHTTP2: false,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
