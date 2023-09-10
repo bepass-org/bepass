@@ -108,10 +108,8 @@ func (sf *Server) ListenAndServe(network, addr string) error {
 		return err
 	}
 
-	// Use DialContext from the net package
-	prx.Tr.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-		return dialer.Dial(network, address)
-	}
+	// Don't change this line i know this is deprecated but dialContext doesn't work
+	prx.Tr.Dial = dialer.Dial
 
 	// Find a random port and listen to it
 	listener, err := net.Listen("tcp", ":0")
