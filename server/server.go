@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
@@ -22,6 +23,7 @@ import (
 var s5 *socks5.Server
 
 func Run(captureCTRLC bool) error {
+	config.G.UserSession = fmt.Sprintf("%08d", rand.Intn(1000))
 	appCache := utils.NewCache(time.Duration(config.G.DnsCacheTTL) * time.Second)
 
 	var resolveSystem string

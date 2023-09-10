@@ -2,6 +2,7 @@
 package utils
 
 import (
+	"bepass/config"
 	"fmt"
 	"net"
 	"net/url"
@@ -22,6 +23,6 @@ func WSEndpointHelper(workerAddress, rawDestAddress, network string) (string, er
 	if err != nil {
 		return "", err
 	}
-	endpoint := fmt.Sprintf("wss://%s/connect?host=%s&port=%s&net=%s", u.Host, dh, dp, network)
+	endpoint := fmt.Sprintf("wss://%s/connect?host=%s&port=%s&net=%s&session=%s", u.Host, dh, dp, network, config.G.UserSession)
 	return endpoint, nil
 }

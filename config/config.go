@@ -28,6 +28,7 @@ type Config struct {
 	DelayBetweenChunks     [2]int          `mapstructure:"DelayBetweenChunks"`
 	Hosts                  []resolve.Hosts `mapstructure:"Hosts"`
 	ResolveSystem          string          `mapstructure:"-"`
+	UserSession            string          `mapstructure:"-"`
 }
 
 var G *Config
