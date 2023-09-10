@@ -4,6 +4,7 @@ package dialer
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 // MakeHTTPClient creates an HTTP client with custom dialing behavior.
 func (d *Dialer) MakeHTTPClient(enableProxy bool) *http.Client {
 	transport := &http.Transport{
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 		ForceAttemptHTTP2: false,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return d.TCPDial(network, addr)
