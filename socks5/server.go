@@ -5,23 +5,19 @@ package socks5
 
 import (
 	"bepass/bufferpool"
+	"bepass/logger"
+	"bepass/socks5/statute"
 	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/elazarl/goproxy"
+	"golang.org/x/net/proxy"
 	"io"
 	"net"
 	"net/http"
-	"strconv"
-
-	"golang.org/x/net/proxy"
-
-	"bepass/logger"
-	"bepass/socks5/statute"
-
-	"github.com/elazarl/goproxy"
 )
 
 // GPool is used to implement custom goroutine pool default use goroutine
@@ -59,13 +55,14 @@ type Server struct {
 	// goroutine pool
 	gPool GPool
 	// user's handle
-	userConnectHandle   func(ctx context.Context, writer io.Writer, request *Request) error
-	userBindHandle      func(ctx context.Context, writer io.Writer, request *Request) error
-	userAssociateHandle func(ctx context.Context, writer io.Writer, request *Request) error
-	done                chan bool
-	listen              net.Listener
-	httpProxyBindAddr   string
-	bindAddress         string
+	userSocks4ConnectHandle func(ctx context.Context, writer io.Writer, request *Request) error
+	userConnectHandle       func(ctx context.Context, writer io.Writer, request *Request) error
+	userBindHandle          func(ctx context.Context, writer io.Writer, request *Request) error
+	userAssociateHandle     func(ctx context.Context, writer io.Writer, request *Request) error
+	done                    chan bool
+	listen                  net.Listener
+	httpProxyBindAddr       string
+	bindAddress             string
 }
 
 // NewServer creates a new Server
@@ -103,7 +100,8 @@ func (sf *Server) ListenAndServe(network, addr string) error {
 	sf.bindAddress = addr
 
 	// Create a custom dialer with DialContext
-	dialer, err := proxy.SOCKS5(network, sf.bindAddress, nil, proxy.Direct)
+	dialer, err := proxy.SOCKS5(network, sf.bindAddress, nil, nil)
+
 	if err != nil {
 		return err
 	}
@@ -286,7 +284,6 @@ func readAsString(r io.Reader) (string, error) {
 
 func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) error {
 	var cddstportdstip [1 + 1 + 2 + 4]byte
-	var destination = ""
 	var dstHost = ""
 	if _, err := io.ReadFull(bufConn, cddstportdstip[:]); err != nil {
 		return err
@@ -297,7 +294,6 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 	if command != uint8(1) {
 		return fmt.Errorf("command %d is not supported", command)
 	}
-	destination = net.JoinHostPort(dstIP.String(), strconv.Itoa(int(dstPort)))
 	// Skip USERID
 	if _, err := readAsString(bufConn); err != nil {
 		return err
@@ -311,37 +307,36 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 		}
 	}
 
+	atype := statute.ATYPIPv4
+
 	if dstHost != "" {
-		destination = net.JoinHostPort(dstHost, strconv.Itoa(int(dstPort)))
+		atype = statute.ATYPDomain
 	}
 
 	if _, err := conn.Write([]byte{0, 90, 0, 0, 0, 0, 0, 0}); err != nil {
 		return err
 	}
 
-	d, err := proxy.SOCKS5("tcp", sf.bindAddress, nil, proxy.Direct)
-	if err != nil {
-		return err
+	request := &Request{
+		Request:     statute.Request{},
+		AuthContext: nil,
+		LocalAddr:   conn.LocalAddr(),
+		RemoteAddr:  conn.RemoteAddr(),
+		DestAddr:    nil,
+		Reader:      bufConn,
+		RawDestAddr: &statute.AddrSpec{
+			FQDN:     dstHost,
+			IP:       dstIP,
+			Port:     int(dstPort),
+			AddrType: atype,
+		},
 	}
-	dstConn, err := d.Dial("tcp", destination)
 
-	if err != nil {
-		return err
+	if sf.userSocks4ConnectHandle != nil {
+		return sf.userSocks4ConnectHandle(context.Background(), io.Writer(conn), request)
 	}
-	var errCh = make(chan error, 2)
-	go func() {
-		_, err := io.Copy(dstConn, bufConn)
-		errCh <- err
-	}()
-	go func() {
-		_, err := io.Copy(conn, dstConn)
-		errCh <- err
-	}()
-	err = <-errCh
-	if err != nil {
-		return err
-	}
-	return <-errCh
+	logger.Errorf("socks4/a without user defined handler is unsupported")
+	return errors.New("unsupported")
 }
 
 // authenticate is used to handle connection authentication

@@ -94,6 +94,13 @@ func WithConnectHandle(h func(ctx context.Context, writer io.Writer, request *Re
 	}
 }
 
+// WithSocks4ConnectHandle is used to handle a user's connect command.
+func WithSocks4ConnectHandle(h func(ctx context.Context, writer io.Writer, request *Request) error) Option {
+	return func(s *Server) {
+		s.userSocks4ConnectHandle = h
+	}
+}
+
 // WithBindHandle is used to handle a user's bind command.
 func WithBindHandle(h func(ctx context.Context, writer io.Writer, request *Request) error) Option {
 	return func(s *Server) {

@@ -103,7 +103,7 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 	base64.RawURLEncoding.Encode(b64, buf)
 
 	if config.G.WorkerEnabled {
-		address = "https://8.8.8.8/dns-query"
+		address = "https://8.8.4.4/dns-query"
 	}
 
 	content, err := c.HTTPClient(address + "?dns=" + string(b64))

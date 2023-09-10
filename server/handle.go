@@ -68,12 +68,14 @@ func (s *Server) extractHostnameOrChangeHTTPHostHeader(data []byte) (
 	return []byte(hello.ServerName), data, false, nil
 }
 
-func (s *Server) processFirstPacket(ctx context.Context, w io.Writer, req *socks5.Request) (
+func (s *Server) processFirstPacket(ctx context.Context, w io.Writer, req *socks5.Request, successReply bool) (
 	*socks5.Request, string, bool, error,
 ) {
-	if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
-		logger.Errorf("failed to send reply: %v", err)
-		return nil, "", false, err
+	if successReply {
+		if err := socks5.SendReply(w, statute.RepSuccess, nil); err != nil {
+			logger.Errorf("failed to send reply: %v", err)
+			return nil, "", false, err
+		}
 	}
 
 	firstPacket := make([]byte, 32*1024)
@@ -88,23 +90,26 @@ func (s *Server) processFirstPacket(ctx context.Context, w io.Writer, req *socks
 		logger.Infof("Hostname %s", string(hostname))
 	}
 
-	IPPort, err := s.resolveDestination(ctx, req)
+	dest, err := s.resolveDestination(ctx, req)
 	if err != nil {
 		return nil, "", false, err
 	}
+
+	IPPort := net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
 
 	// if user has a faulty dns, and it returns dpi ip,
 	// we resolve destination based on extracted tls sni or http hostname
 	if hostname != nil && strings.Contains(IPPort, "10.10.3") {
 		logger.Infof("%s is dpi ip extracting destination host from packets...", IPPort)
 		req.RawDestAddr.FQDN = string(hostname)
-		IPPort, err = s.resolveDestination(ctx, req)
+		dest, err = s.resolveDestination(ctx, req)
 		if err != nil {
 			// if destination resolved to dpi and we cant resolve to actual destination
 			// it's pointless to connect to dpi
 			logger.Infof("system was unable to extract destination host from packets!")
 			return nil, "", false, err
 		}
+		IPPort = net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
 	}
 
 	req.Reader = &utils.BufferedReader{
@@ -116,10 +121,14 @@ func (s *Server) processFirstPacket(ctx context.Context, w io.Writer, req *socks
 	return req, IPPort, isHTTP, nil
 }
 
-func (s *Server) HandleTCPTunnel(ctx context.Context, w io.Writer, req *socks5.Request) error {
-	r, _, _, err := s.processFirstPacket(ctx, w, req)
+func (s *Server) HandleTCPTunnel(ctx context.Context, w io.Writer, req *socks5.Request, successReply bool) error {
+	r, _, _, err := s.processFirstPacket(ctx, w, req, successReply)
 	if err != nil {
 		return err
+	}
+	dest, err := s.resolveDestination(ctx, req)
+	if err == nil {
+		req.RawDestAddr = dest
 	}
 	return s.Transport.TunnelTCP(w, r)
 }
@@ -129,8 +138,8 @@ func (s *Server) HandleUDPTunnel(_ context.Context, w io.Writer, req *socks5.Req
 }
 
 // HandleTCPFragment handles the SOCKS5 request and forwards traffic to the destination.
-func (s *Server) HandleTCPFragment(ctx context.Context, w io.Writer, req *socks5.Request) error {
-	r, IPPort, isHTTP, err := s.processFirstPacket(ctx, w, req)
+func (s *Server) HandleTCPFragment(ctx context.Context, w io.Writer, req *socks5.Request, successReply bool) error {
+	r, IPPort, isHTTP, err := s.processFirstPacket(ctx, w, req, successReply)
 	if err != nil {
 		return err
 	}
@@ -174,13 +183,13 @@ func (s *Server) Copy(reader io.Reader, writer io.Writer) error {
 	return err
 }
 
-func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (string, error) {
+func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (*statute.AddrSpec, error) {
 	dest := req.RawDestAddr
 
 	if dest.FQDN != "" {
 		ip, err := s.Resolve(dest.FQDN)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		dest.IP = net.ParseIP(ip)
 		logger.Infof("resolved %s to %s", req.RawDestAddr, dest)
@@ -188,8 +197,7 @@ func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (str
 		logger.Infof("skipping resolution for %s", req.RawDestAddr)
 	}
 
-	addr := net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
-	return addr, nil
+	return dest, nil
 }
 
 // Resolve resolves the FQDN to an IP address using the specified resolution mechanism.

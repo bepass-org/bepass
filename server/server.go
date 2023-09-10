@@ -108,7 +108,10 @@ func Run(captureCTRLC bool) error {
 	if workerConfig.WorkerEnabled && !workerConfig.WorkerDNSOnly {
 		s5 = socks5.NewServer(
 			socks5.WithConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
-				return serverHandler.HandleTCPTunnel(ctx, w, req)
+				return serverHandler.HandleTCPTunnel(ctx, w, req, true)
+			}),
+			socks5.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+				return serverHandler.HandleTCPTunnel(ctx, w, req, false)
 			}),
 			socks5.WithAssociateHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
 				return serverHandler.HandleUDPTunnel(ctx, w, req)
@@ -117,7 +120,10 @@ func Run(captureCTRLC bool) error {
 	} else {
 		s5 = socks5.NewServer(
 			socks5.WithConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
-				return serverHandler.HandleTCPFragment(ctx, w, req)
+				return serverHandler.HandleTCPFragment(ctx, w, req, true)
+			}),
+			socks5.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+				return serverHandler.HandleTCPFragment(ctx, w, req, false)
 			}),
 		)
 	}

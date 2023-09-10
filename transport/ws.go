@@ -75,7 +75,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 		if time.Now().Unix()-lastActivityStamp > w.LinkIdleTimeout {
 			return
 		}
-		for {
+		for limit := 0; limit < 10; limit++ {
 			done := make(chan struct{})
 			doneR := make(chan struct{})
 
@@ -149,12 +149,12 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 
 						if err != nil {
 							if strings.Contains(err.Error(), "websocket: close") ||
-								strings.Contains(err.Error(), "i/o") {
+								strings.Contains(err.Error(), "limit/o") {
 								logger.Errorf("reading from udp over tcp error: %v\r\n", err)
 								return
 							}
 							logger.Errorf("reading from udp over TCP tunnel packet size error: %v\r\n", err)
-							continue
+							return
 						}
 
 						// The first 2 packets of response are channel ID
