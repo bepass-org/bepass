@@ -111,7 +111,7 @@ func Run(captureCTRLC bool) error {
 				return serverHandler.HandleTCPTunnel(ctx, w, req)
 			}),
 			socks5.WithAssociateHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
-				return serverHandler.HandleTCPTunnel(ctx, w, req)
+				return serverHandler.HandleUDPTunnel(ctx, w, req)
 			}),
 		)
 	} else {

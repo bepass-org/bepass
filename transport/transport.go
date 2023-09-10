@@ -113,7 +113,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 		}
 		return fmt.Errorf("listen udp failed, %v", err)
 	}
-	fmt.Println(bindLn.LocalAddr())
+	logger.Infof("listening on %s udp for associate", bindLn.LocalAddr())
 	if err := socks5.SendReply(w, statute.RepSuccess, bindLn.LocalAddr()); err != nil {
 		logger.Errorf("failed to send reply: %v", err)
 		return err
