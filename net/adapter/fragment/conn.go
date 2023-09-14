@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 // Adapter represents an adapter for implementing fragmentation as net.Conn interface
@@ -36,10 +38,10 @@ func New(conn net.Conn) *Adapter {
 	return &Adapter{
 		conn:         conn,
 		isFirstWrite: true,
-		BSL:          config.G.ChunksLengthBeforeSni,
-		SL:           config.G.SniChunksLength,
-		ASL:          config.G.ChunksLengthBeforeSni,
-		Delay:        config.G.DelayBetweenChunks,
+		BSL:          config.Fragment.Advanced.Bsl,
+		SL:           config.Fragment.Advanced.Sl,
+		ASL:          config.Fragment.Advanced.Asl,
+		Delay:        config.Fragment.Delay,
 	}
 }
 
@@ -108,9 +110,26 @@ func (a *Adapter) fragmentAndWriteFirstPacket(b []byte) (int, error) {
 	// before helloPacketSni
 	chunks[0] = make([]byte, index)
 	copy(chunks[0], b[:index])
+
 	// helloPacketSni
+	// Create new rand source with seed
+	source := rand.NewSource(time.Now().UnixNano())
+	rng := rand.New(source)
+
+	var result strings.Builder
+
+	// Use rng instead of rand
+	for _, r := range string(helloPacketSni) {
+		if rng.Intn(2) == 0 {
+			result.WriteRune(unicode.ToUpper(r))
+		} else {
+			result.WriteRune(r)
+		}
+	}
+	helloPacketSni = []byte(result.String())
 	chunks[1] = make([]byte, len(helloPacketSni))
 	copy(chunks[1], b[index:index+len(helloPacketSni)])
+
 	// after helloPacketSni
 	chunks[2] = make([]byte, len(b)-index-len(helloPacketSni))
 	copy(chunks[2], b[index+len(helloPacketSni):])

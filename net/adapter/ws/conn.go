@@ -71,7 +71,7 @@ func (a *Adapter) Write(b []byte) (int, error) {
 	}
 
 	bytesWritten, err := nextWriter.Write(b)
-	nextWriter.Close()
+	_ = nextWriter.Close()
 
 	return bytesWritten, err
 }
