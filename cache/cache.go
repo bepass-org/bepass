@@ -1,5 +1,26 @@
-// Package utils provides utility functions including a cache implementation.
-package utils
+// Package cache is a thread-safe in-memory cache implementation with expiration support.
+// It allows you to store key-value pairs with optional expiration times.
+//
+// Usage:
+//
+//	// Create a new cache with a 10-minute default expiration time.
+//	myCache := NewCache(10 * time.Minute)
+//
+//	// Store a value with a key and an optional expiration duration.
+//	myCache.Set("myKey", myValue)
+//
+//	// Retrieve a value from the cache. Returns the value and true if found, or nil and false if not found.
+//	value, found := myCache.Get("myKey")
+//
+//	// Check if a key exists in the cache.
+//	if found {
+//	    // Value exists in the cache.
+//	    fmt.Println(value)
+//	} else {
+//	    // Value not found in the cache.
+//	    fmt.Println("Key not found")
+//	}
+package cache
 
 import (
 	"fmt"
@@ -22,28 +43,6 @@ func (item Item) Expired() bool {
 	return time.Now().UnixNano() > item.Expiration
 }
 
-// Cache is a thread-safe in-memory cache implementation with expiration support.
-// It allows you to store key-value pairs with optional expiration times.
-//
-// Usage:
-//
-//	// Create a new cache with a 10-minute default expiration time.
-//	myCache := NewCache(10 * time.Minute)
-//
-//	// Store a value with a key and an optional expiration duration.
-//	myCache.Set("myKey", myValue)
-//
-//	// Retrieve a value from the cache. Returns the value and true if found, or nil and false if not found.
-//	value, found := myCache.Get("myKey")
-//
-//	// Check if a key exists in the cache.
-//	if found {
-//	    // Value exists in the cache.
-//	    fmt.Println(value)
-//	} else {
-//	    // Value not found in the cache.
-//	    fmt.Println("Key not found")
-//	}
 type Cache struct {
 	*cache
 }
