@@ -24,25 +24,19 @@ type EstablishedTunnel struct {
 
 // WSTunnel represents a WebSocket tunnel.
 type WSTunnel struct {
-	BindAddress        string
-	Dialer             *dialer.Dialer
-	ReadTimeout        int
-	WriteTimeout       int
-	LinkIdleTimeout    int64
 	EstablishedTunnels map[string]*EstablishedTunnel
-	ShortClientID      string
 }
 
 // Dial establishes a WebSocket connection.
 func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	d := websocket.Dialer{
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return w.Dialer.HttpDial(network, config.G.WorkerIPPortAddress)
+			return dialer.HttpDial(network, config.Worker.Host)
 		},
 
 		NetDialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return w.Dialer.TLSDial(func(network, addr string) (net.Conn, error) {
-				return w.Dialer.FragmentDial(network, config.G.WorkerIPPortAddress)
+			return dialer.TLSDial(func(network, addr string) (net.Conn, error) {
+				return dialer.FragmentDial(network, config.Worker.Host)
 			}, network, addr)
 		},
 	}
@@ -72,7 +66,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 
 	go func() {
 		defer delete(w.EstablishedTunnels, tunnelEndpoint)
-		if time.Now().Unix()-lastActivityStamp > w.LinkIdleTimeout {
+		if time.Now().Unix()-lastActivityStamp > config.Udp.Timeout {
 			return
 		}
 		for limit := 0; limit < 10; limit++ {
@@ -102,7 +96,9 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 					case <-done:
 						return
 					case rt := <-tunnelWriteChannel:
-						err := conn.SetWriteDeadline(time.Now().Add(time.Duration(w.WriteTimeout) * time.Second))
+						err := conn.SetWriteDeadline(time.Now().Add(time.Duration(
+							config.Udp.Timeout,
+						) * time.Second))
 						if err != nil {
 							return
 						}
@@ -110,7 +106,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 						bs := make([]byte, 2)
 						binary.BigEndian.PutUint16(bs, rt.Channel)
 
-						_, err = conn.Write(append([]byte(w.ShortClientID), append(bs, rt.Data...)...))
+						_, err = conn.Write(append([]byte(config.Session.ClientID), append(bs, rt.Data...)...))
 						if err != nil {
 							logger.Info("write:", err)
 							return
@@ -127,7 +123,9 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 					_ = conn.Close()
 				}()
 
-				err := conn.SetReadDeadline(time.Now().Add(time.Duration(w.ReadTimeout) * time.Second))
+				err := conn.SetReadDeadline(time.Now().Add(time.Duration(
+					config.Udp.Timeout,
+				) * time.Second))
 				if err != nil {
 					return
 				}
@@ -157,7 +155,7 @@ func (w *WSTunnel) PersistentDial(tunnelEndpoint string, bindWriteChannel chan U
 							return
 						}
 
-						// The first 2 packets of response are channel ID
+						// The first 2 packets of response are channel SessionID
 						channelID := binary.BigEndian.Uint16(rawPacket[:2])
 
 						pkt := UDPPacket{

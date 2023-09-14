@@ -2,82 +2,12 @@ package config
 
 import (
 	"bepass/logger"
+	"bepass/utils"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 )
-
-var js = []byte(`
-{
-  "server": {
-    "bind": "0.0.0.0:8085",
-    "legacy": true,
-    "http": true
-  },
-  "tls": {
-    "padding": {
-      "enabled": false,
-      "settings": {
-        "length": [
-          40,
-          80
-        ]
-      }
-    },
-	"allow_insecure": true,
-	"fingerprint": "chrome|edge|firefox|safari|ios|android",
-  },
-  "fragment": {
-    "enable": true,
-    "delay": [
-      10,
-      30
-    ],
-    "mode": "weak|strong|aggressive|advanced",
-    "advanced": {
-      "bsl": [
-        2000,
-        2000
-      ],
-      "sl": [
-        5,
-        5
-      ],
-      "asl": [
-        2000,
-        2000
-      ]
-    }
-  },
-  "dns": {
-    "strategy": "remote|local",
-    "prefer": "v4|v6|both",
-    "type": "doh|dot|sdns",
-    "address": "https://dns.rotunneling.net/dns-query/public",
-    "ttl": "300",
-    "timeout": "10",
-    "fragment": false,
-    "hosts": {
-      "domain": "dns.rotunneling.net",
-      "ip": "172.66.42.222"
-    }
-  },
-  "worker": {
-    "enable": "true",
-    "sni": "uoosef-worker.uoosef.workers.dev",
-    "host": "172.64.136.11:8443",
-    "scanner": false
-  },
-  "udp": {
-    "enable": true,
-    "timeout": 120
-  },
-  "unix": {
-    "sockets": "protected|normal"
-  }
-}
-`)
 
 type server struct {
 	Bind   string `json:"bind"`
@@ -87,8 +17,8 @@ type server struct {
 
 type tls struct {
 	Padding struct {
-		Enabled bool   `json:"enabled"`
-		Setting [2]int `json:"settings"`
+		Enabled     bool   `json:"enabled"`
+		LengthRange [2]int `json:"settings"`
 	} `json:"padding"`
 	AllowInsecure bool   `json:"allow_insecure"`
 	Fingerprint   string `json:"fingerprint"`
@@ -105,18 +35,21 @@ type fragment struct {
 	} `json:"advanced"`
 }
 
+// Hosts represents a domain-to-IP mapping entry in the local hosts file.
+type Hosts struct {
+	Domain string
+	IP     string
+}
+
 type dns struct {
-	Strategy string `json:"strategy"`
-	Prefer   string `json:"prefer"`
-	Type     string `json:"type"`
-	Address  string `json:"address"`
-	Ttl      int    `json:"ttl"`
-	Timeout  string `json:"timeout"`
-	Fragment bool   `json:"fragment"`
-	Hosts    struct {
-		Domain string `json:"domain"`
-		Ip     string `json:"ip"`
-	} `json:"hosts"`
+	Strategy string  `json:"strategy"`
+	Prefer   string  `json:"prefer"`
+	Type     string  `json:"type"`
+	Address  string  `json:"address"`
+	Ttl      int     `json:"ttl"`
+	Timeout  string  `json:"timeout"`
+	Fragment bool    `json:"fragment"`
+	Hosts    []Hosts `json:"hosts"`
 }
 
 type worker struct {
@@ -127,16 +60,18 @@ type worker struct {
 }
 
 type udp struct {
-	Enable  bool `json:"enable"`
-	Timeout int  `json:"timeout"`
+	Enable  bool   `json:"enable"`
+	Bind    string `json:"bind"`
+	Timeout int64  `json:"timeout"`
 }
 
 type unix struct {
-	Sockets string `json:"sockets"`
+	ProtectSockets bool `json:"sockets"`
 }
 
 type session struct {
-	ID string
+	SessionID string
+	ClientID  string
 }
 
 type config struct {
@@ -174,7 +109,8 @@ func FromJSON(jsonStr []byte) {
 		logger.Fatalf("failed to unmarshal config: %v", err)
 	}
 	Session = session{
-		ID: fmt.Sprintf("%d", rand.Intn(8999)+1000),
+		SessionID: fmt.Sprintf("%d", rand.Intn(8999)+1000),
+		ClientID:  utils.ShortID(6),
 	}
 }
 

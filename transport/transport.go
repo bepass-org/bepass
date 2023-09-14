@@ -3,7 +3,7 @@ package transport
 
 import (
 	"bepass/bufferpool"
-	"bepass/dialer"
+	"bepass/config"
 	"bepass/logger"
 	"bepass/net/adapter/ws"
 	"bepass/socks5"
@@ -27,21 +27,10 @@ type UDPBind struct {
 	RecvChan      chan UDPPacket
 }
 
-// UDPConf represents UDP configuration.
-type UDPConf struct {
-	ReadTimeout     int
-	WriteTimeout    int
-	LinkIdleTimeout int
-}
-
 // Transport represents the transport layer.
 type Transport struct {
-	WorkerAddress string
-	BindAddress   string
-	Dialer        *dialer.Dialer
-	BufferPool    bufferpool.BufPool
-	UDPBind       string
-	Tunnel        *WSTunnel
+	BufferPool bufferpool.BufPool
+	Tunnel     *WSTunnel
 }
 
 // UDPPacket represents a UDP packet.
@@ -52,7 +41,7 @@ type UDPPacket struct {
 
 // TunnelTCP handles tcp network traffic.
 func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
-	tunnelEndpoint, err := utils.WSEndpointHelper(t.WorkerAddress, req.RawDestAddr.String(), "tcp")
+	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "tcp")
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
@@ -80,7 +69,10 @@ func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
 	}
 
 	// flush ws stream to write
-	conn.Write([]byte{})
+	_, err = conn.Write([]byte{})
+	if err != nil {
+		return err
+	}
 
 	errCh := make(chan error)
 	go func() { errCh <- t.Copy(req.Reader, conn) }()
@@ -104,7 +96,7 @@ func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
 
 // TunnelUDP tunnels UDP packets over WebSocket.
 func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
-	udpAddr, _ := net.ResolveUDPAddr("udp", t.UDPBind+":0") // Use _ to indicate the error is intentionally ignored
+	udpAddr, _ := net.ResolveUDPAddr("udp", config.Udp.Bind+":0") // Use _ to indicate the error is intentionally ignored
 	// connect to remote server via ws
 	bindLn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
@@ -119,7 +111,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 		return err
 	}
 
-	tunnelEndpoint, err := utils.WSEndpointHelper(t.WorkerAddress, req.RawDestAddr.String(), "udp")
+	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "udp")
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err

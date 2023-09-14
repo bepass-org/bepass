@@ -1,5 +1,4 @@
 // Package sni provides functionality for parsing the first HTTP request on a connection
-// and returning metadata for virtual host muxing.
 package sni
 
 import (
@@ -10,8 +9,7 @@ import (
 	"net/http"
 )
 
-// ParseHTTPHost parses the head of the first HTTP request on conn and returns
-// a new, unread connection with metadata for virtual host muxing
+// ParseHTTPHost parses the head of the first HTTP request on conn
 func ParseHTTPHost(rd io.Reader) (string, []byte, error) {
 	var request *http.Request
 	var err error
@@ -31,7 +29,10 @@ func ParseHTTPHost(rd io.Reader) (string, []byte, error) {
 	host := request.Host
 
 	var buff bytes.Buffer
-	request.Write(&buff)
+	err = request.Write(&buff)
+	if err != nil {
+		return "", nil, err
+	}
 	b := bytes.Replace(buff.Bytes(), []byte("Host:"), []byte("hOSt:"), -1)
 	return host, b, nil
 }

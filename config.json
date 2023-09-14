@@ -1,44 +1,69 @@
 {
-  "TLSHeaderLength": 5,
-  "TLSPaddingEnabled": false,
-  "TLSPaddingSize": [
-    40,
-    80
-  ],
-  "RemoteDNSAddr": "https://yarp.lefolgoc.net/dns-query",
-  "EnableDNSFragmentation": false,
-  "DnsCacheTTL": 3000000,
-  "DnsRequestTimeout": 10,
-  "BindAddress": "0.0.0.0:8085",
-  "ChunksLengthBeforeSni": [
-    2000,
-    2000
-  ],
-  "SniChunksLength": [
-    5,
-    10
-  ],
-  "ChunksLengthAfterSni": [
-    2000,
-    2000
-  ],
-  "DelayBetweenChunks": [
-    10,
-    20
-  ],
-  "WorkerAddress": "https://<your_worker>.workers.dev/dns-query",
-  "WorkerIPPortAddress": "104.17.196.93:2096",
-  "WorkerEnabled": true,
-  "WorkerDNSOnly": false,
-  "EnableLowLevelSockets": false,
-  "Hosts": [
-    {
-      "Domain": "yarp.lefolgoc.net",
-      "IP": "5.39.88.20"
+  "server": {
+    "bind": "0.0.0.0:8085",
+    "legacy": true,
+    "http": true
+  },
+  "tls": {
+    "padding": {
+      "enabled": false,
+      "settings": {
+        "length": [
+          40,
+          80
+        ]
+      }
+    },
+    "allow_insecure": true,
+    "fingerprint": "chrome|edge|firefox|safari|ios|android"
+  },
+  "fragment": {
+    "enable": true,
+    "delay": [
+      10,
+      30
+    ],
+    "mode": "weak|strong|aggressive|advanced",
+    "advanced": {
+      "bsl": [
+        2000,
+        2000
+      ],
+      "sl": [
+        5,
+        5
+      ],
+      "asl": [
+        2000,
+        2000
+      ]
     }
-  ],
-  "UDPBindAddress": "0.0.0.0",
-  "UDPReadTimeout": 120,
-  "UDPWriteTimeout": 120,
-  "UDPLinkIdleTimeout": 120
+  },
+  "dns": {
+    "strategy": "remote|local",
+    "prefer": "v4|v6|both",
+    "type": "doh|dot|sdns",
+    "address": "https://dns.rotunneling.net/dns-query/public",
+    "ttl": "300",
+    "timeout": "10",
+    "fragment": false,
+    "hosts": {
+      "domain": "dns.rotunneling.net",
+      "ip": "172.66.42.222"
+    }
+  },
+  "worker": {
+    "enable": "true",
+    "sni": "worker_name.user.workers.dev",
+    "host": "<ip>:<port>",
+    "scanner": false
+  },
+  "udp": {
+    "enable": true,
+    "bind": "127.0.0.1",
+    "timeout": 120
+  },
+  "unix": {
+    "sockets": "protected|normal"
+  }
 }

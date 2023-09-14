@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bepass/cache"
+	"bepass/config"
 	"bepass/dialer"
 	"bepass/doh"
 	"bepass/logger"
@@ -25,33 +27,10 @@ import (
 	"github.com/miekg/dns"
 )
 
-// FragmentConfig Constants for chunk lengths and delays.
-type FragmentConfig struct {
-	BSL   [2]int
-	ASL   [2]int
-	Delay [2]int
-}
-
-// WorkerConfig Constants for cloudflare worker.
-type WorkerConfig struct {
-	WorkerAddress       string
-	WorkerIPPortAddress string
-	WorkerEnabled       bool
-	WorkerDNSOnly       bool
-}
-
 type Server struct {
-	RemoteDNSAddr         string
-	Cache                 *utils.Cache
-	ResolveSystem         string
-	DoHClient             *doh.Client
-	ChunkConfig           FragmentConfig
-	WorkerConfig          WorkerConfig
-	Dialer                *dialer.Dialer
-	BindAddress           string
-	EnableLowLevelSockets bool
-	LocalResolver         *resolve.LocalResolver
-	Transport             *transport.Transport
+	DoHClient     *doh.Client
+	LocalResolver *resolve.LocalResolver
+	Transport     *transport.Transport
 }
 
 // extractHostnameOrChangeHTTPHostHeader This function extracts the tls sni or http
@@ -149,9 +128,9 @@ func (s *Server) HandleTCPFragment(ctx context.Context, w io.Writer, req *socks5
 	var conn net.Conn
 
 	if isHTTP {
-		conn, err = s.Dialer.HttpDial("tcp", IPPort)
+		conn, err = dialer.HttpDial("tcp", IPPort)
 	} else {
-		conn, err = s.Dialer.FragmentDial("tcp", IPPort)
+		conn, err = dialer.FragmentDial("tcp", IPPort)
 	}
 
 	if err != nil {
@@ -202,9 +181,9 @@ func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (*st
 
 // Resolve resolves the FQDN to an IP address using the specified resolution mechanism.
 func (s *Server) Resolve(fqdn string) (string, error) {
-	if s.WorkerConfig.WorkerEnabled &&
-		strings.Contains(s.WorkerConfig.WorkerAddress, fqdn) {
-		dh, _, err := net.SplitHostPort(s.WorkerConfig.WorkerIPPortAddress)
+	if config.Worker.Enable &&
+		strings.Contains(config.Worker.Sni, fqdn) {
+		dh, _, err := net.SplitHostPort(config.Worker.Host)
 		if strings.Contains(dh, ":") {
 			// its ipv6
 			dh = "[" + dh + "]"
@@ -219,8 +198,8 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 		return h, nil
 	}
 
-	if s.ResolveSystem == "doh" {
-		u, err := url.Parse(s.RemoteDNSAddr)
+	if config.Dns.Type == "doh" {
+		u, err := url.Parse(config.Dns.Address)
 		if err == nil {
 			if u.Hostname() == fqdn {
 				return s.LocalResolver.Resolve(u.Hostname()), nil
@@ -234,7 +213,7 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 	}
 
 	// Check the cache for fqdn
-	if cachedValue, _ := s.Cache.Get(fqdn); cachedValue != nil {
+	if cachedValue, _ := cache.Get(fqdn); cachedValue != nil {
 		logger.Infof("using cached value for %s", fqdn)
 		return cachedValue.(string), nil
 	}
@@ -252,7 +231,7 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 	// Determine which DNS resolution mechanism to use
 	var exchange *dns.Msg
 	var err error
-	switch s.ResolveSystem {
+	switch config.Dns.Type {
 	case "doh":
 		exchange, err = s.resolveDNSWithDOH(&req)
 	default:
@@ -270,20 +249,17 @@ func (s *Server) Resolve(fqdn string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		s.Cache.Set(fqdn, ip)
+		cache.Set(fqdn, ip)
 		return ip, nil
 	}
 	ip := record[4]
-	s.Cache.Set(fqdn, ip)
+	cache.Set(fqdn, ip)
 	return ip, nil
 }
 
 // resolveDNSWithDOH resolves DNS using DNS-over-HTTP (DoH) client.
 func (s *Server) resolveDNSWithDOH(req *dns.Msg) (*dns.Msg, error) {
-	dnsAddr := s.RemoteDNSAddr
-	if s.WorkerConfig.WorkerEnabled && s.WorkerConfig.WorkerDNSOnly {
-		dnsAddr = s.WorkerConfig.WorkerAddress
-	}
+	dnsAddr := config.Dns.Address
 
 	exchange, _, err := s.DoHClient.Exchange(req, dnsAddr)
 	if err != nil {
@@ -300,7 +276,7 @@ func (s *Server) resolveDNSWithDNSCrypt(req *dns.Msg) (*dns.Msg, error) {
 	c := dnscrypt.Client{
 		Net: "tcp", Timeout: 10 * time.Second,
 	}
-	resolverInfo, err := c.Dial(s.RemoteDNSAddr)
+	resolverInfo, err := c.Dial(config.Dns.Address)
 	if err != nil {
 		return nil, err
 	}

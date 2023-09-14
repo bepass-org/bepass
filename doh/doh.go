@@ -54,7 +54,7 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 		origID   = req.Id
 	)
 
-	// Set DNS ID as zero according to RFC8484 (cache-friendly)
+	// Set DNS SessionID as zero according to RFC8484 (cache-friendly)
 	req.Id = 0
 	buf, err = req.Pack()
 	if err != nil {

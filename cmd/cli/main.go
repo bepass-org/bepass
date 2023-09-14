@@ -4,6 +4,7 @@ package main
 import (
 	"bepass/config"
 	"bepass/logger"
+	"bepass/server"
 	"errors"
 	"flag"
 	"fmt"
@@ -55,7 +56,10 @@ func main() {
 		}
 		config.FromFile(*configFile)
 	}
-
+	err := server.Run(true)
+	if err != nil {
+		logger.Fatalf("failed to start server: %v", err)
+	}
 }
 
 func printHelp() {

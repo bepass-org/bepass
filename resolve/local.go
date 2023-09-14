@@ -2,18 +2,13 @@
 package resolve
 
 import (
+	"bepass/config"
 	"net"
 )
 
-// Hosts represents a domain-to-IP mapping entry in the local hosts file.
-type Hosts struct {
-	Domain string
-	IP     string
-}
-
 // LocalResolver is a resolver that can check a local hosts file for domain-to-IP mappings.
 type LocalResolver struct {
-	Hosts []Hosts
+	Hosts []config.Hosts
 }
 
 // Resolve attempts to resolve a given domain to an IP address. It first checks
