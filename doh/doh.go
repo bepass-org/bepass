@@ -4,6 +4,7 @@ package doh
 import (
 	"bepass/config"
 	"bepass/dialer"
+	"bepass/logger"
 	"bepass/resolve"
 	"encoding/base64"
 	"errors"
@@ -14,64 +15,24 @@ import (
 	"github.com/miekg/dns"
 )
 
-// ClientOptions represents options for configuring the DNS-over-HTTPS (DoH) client.
-type ClientOptions struct {
-	EnableDNSFragment bool                   // Enable DNS fragmentation
-	Dialer            *dialer.Dialer         // Custom dialer for HTTP requests
-	LocalResolver     *resolve.LocalResolver // Local DNS resolver
-}
-
-// ClientOption is a function type used for setting client options.
-type ClientOption func(*ClientOptions) error
-
-// WithDialer sets the custom dialer for the DoH client.
-func WithDialer(b *dialer.Dialer) ClientOption {
-	return func(o *ClientOptions) error {
-		o.Dialer = b
-		return nil
-	}
-}
-
-// WithDNSFragmentation enables or disables DNS fragmentation for the DoH client.
-func WithDNSFragmentation(f bool) ClientOption {
-	return func(o *ClientOptions) error {
-		o.EnableDNSFragment = f
-		return nil
-	}
-}
-
-// WithLocalResolver sets the local DNS resolver for the DoH client.
-func WithLocalResolver(r *resolve.LocalResolver) ClientOption {
-	return func(o *ClientOptions) error {
-		o.LocalResolver = r
-		return nil
-	}
-}
-
 // Client represents a DNS-over-HTTPS (DoH) client.
 type Client struct {
-	opt *ClientOptions
-}
-
-// NewClient creates a new DoH client with the provided options.
-func NewClient(opts ...ClientOption) *Client {
-	o := &ClientOptions{}
-	for _, f := range opts {
-		f(o)
-	}
-	return &Client{
-		opt: o,
-	}
+	LocalResolver *resolve.LocalResolver
 }
 
 // HTTPClient performs an HTTP GET request to the given address using the configured client.
 func (c *Client) HTTPClient(address string) ([]byte, error) {
-	client := c.opt.Dialer.MakeHTTPClient(config.G.WorkerEnabled)
+	client := dialer.MakeHTTPClient(config.Worker.Enable)
 	resp, err := client.Get(address)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			logger.Errorf("doh failed to close response body: %v", err)
+		}
+	}()
 
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -102,7 +63,7 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 	b64 = make([]byte, base64.RawURLEncoding.EncodedLen(len(buf)))
 	base64.RawURLEncoding.Encode(b64, buf)
 
-	if config.G.WorkerEnabled {
+	if config.Worker.Enable {
 		address = "https://8.8.4.4/dns-query"
 	}
 
