@@ -4,78 +4,65 @@ package main
 import (
 	"bepass/config"
 	"bepass/logger"
-	"bepass/server"
-	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"strings"
-	"syscall"
-
-	"github.com/peterbourgon/ff/v4"
-	"github.com/peterbourgon/ff/v4/ffhelp"
 )
 
-var configPath string
+const (
+	// Version is the current version of the application.
+	Version       = "2.0.0-alpha"
+	DefaultConfig = "config.json"
+)
 
 func main() {
-	fs := ff.NewFlags("Bepass")
-	fs.StringVar(&configPath, 'c', "config", "./config.json", "Path to configuration file")
 
-	err := ff.Parse(fs, os.Args[1:])
-	switch {
-	case errors.Is(err, ff.ErrHelp):
-		logger.Errorf("%s\n", ffhelp.Flags(fs))
-		os.Exit(0)
-	case err != nil:
-		logger.Errorf("error: %v\n", err)
-		os.Exit(1)
+	configFile := flag.String("config", "config.json", "Configuration file location")
+	configShort := flag.String("c", "config.json", "Configuration file (shorthand)")
+
+	showHelp := flag.Bool("help", false, "Show help message")
+	helpShort := flag.Bool("h", false, "Show help (shorthand)")
+
+	showVersion := flag.Bool("version", false, "Show version")
+	versionShort := flag.Bool("v", false, "Show version (shorthand)")
+
+	flag.Parse()
+
+	if *showHelp || *helpShort {
+		printHelp()
+		return
 	}
 
-	// Load and validate configuration from JSON file
-	err = loadConfig(configPath)
-	if err != nil {
-		logger.Fatal("", err)
+	if *showVersion || *versionShort {
+		printVersion()
+		return
 	}
 
-	// Run the server with the loaded configuration
-	err = server.Run(true)
-	if err != nil {
-		logger.Fatal("", err)
-	}
-
-	// HandleTCPTunnel graceful shutdown
-	handleShutdown()
-}
-
-func loadConfig(configPath string) error {
-	file, err := os.Open(configPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(config.G)
-	if err != nil {
-		if strings.Contains(err.Error(), "invalid character") {
-			return fmt.Errorf("configuration file is not valid JSON")
+	if (configFile == nil || *configFile == "") && (configShort == nil || *configShort == "") {
+		if _, err := os.Stat(DefaultConfig); errors.Is(err, os.ErrNotExist) {
+			logger.Fatalf("config file not found: %v", err.Error())
 		}
-		return err
+		config.FromFile(DefaultConfig)
+	} else if configFile != nil && *configFile != "" {
+		if _, err := os.Stat(*configFile); errors.Is(err, os.ErrNotExist) {
+			logger.Fatalf("config file not found: %v", err.Error())
+		}
+		config.FromFile(*configFile)
+	} else if configFile != nil && *configFile != "" {
+		if _, err := os.Stat(*configFile); errors.Is(err, os.ErrNotExist) {
+			logger.Fatalf("config file not found: %v", err.Error())
+		}
+		config.FromFile(*configFile)
 	}
 
-	return nil
 }
 
-func handleShutdown() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+func printHelp() {
+	fmt.Println("Usage:")
+	flag.PrintDefaults()
+}
 
-	// Block until a signal is received.
-	<-c
-
-	// Perform cleanup or shutdown tasks here.
-	fmt.Println("Shutting down gracefully...")
-	os.Exit(0)
+func printVersion() {
+	fmt.Println("Version:", Version)
 }
