@@ -3,7 +3,8 @@
 package dialer
 
 import (
-	"encoding/binary"
+	"bepass/config"
+	"bepass/logger"
 	"fmt"
 	tls "github.com/refraction-networking/utls"
 	"io"
@@ -14,8 +15,8 @@ import (
 )
 
 const (
-	extensionServerName  uint16 = 0x0
-	utlsExtensionPadding uint16 = 0x15
+	extensionServerName uint16 = 0x0
+	tlsExtensionPadding uint16 = 0x15
 )
 
 func hostnameInSNI(name string) string {
@@ -101,8 +102,8 @@ func (e *FakePaddingExtension) Read(b []byte) (n int, err error) {
 		return 0, io.ErrShortBuffer
 	}
 	// https://tools.ietf.org/html/rfc7627
-	b[0] = byte(utlsExtensionPadding >> 8)
-	b[1] = byte(utlsExtensionPadding)
+	b[0] = byte(tlsExtensionPadding >> 8)
+	b[1] = byte(tlsExtensionPadding)
 	b[2] = byte(e.PaddingLen >> 8)
 	b[3] = byte(e.PaddingLen)
 	x := make([]byte, e.PaddingLen)
@@ -115,24 +116,19 @@ func (e *FakePaddingExtension) Read(b []byte) (n int, err error) {
 }
 
 // makeTLSHelloPacketWithPadding creates a TLS hello packet with padding.
-func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.Config, sni string) (*tls.UConn, error) {
-	paddingMax := d.TLSPaddingSize[1]
-	paddingMin := d.TLSPaddingSize[0]
-	paddingSize := paddingMax
-	if paddingMax > paddingMin {
-		// Generate a random 32-bit integer using crypto/rand
-		randomBytes := make([]byte, 4)
-		_, err := rand.Read(randomBytes)
-		if err != nil {
-			return nil, err
-		}
-		randomInt := int(binary.BigEndian.Uint32(randomBytes))
-
-		// Calculate paddingSize using crypto/rand-generated randomInt
-		paddingSize = randomInt%(paddingMax-paddingMin+1) + paddingMin
+func makeTLSHelloPacketWithPadding(plainConn net.Conn, cfg *tls.Config, sni string) (*tls.UConn, error) {
+	paddingMax := config.Tls.Padding.LengthRange[1]
+	paddingMin := config.Tls.Padding.LengthRange[0]
+	paddingSize := paddingMin
+	if paddingMax-paddingMin > 0 {
+		paddingSize = rand.Intn(paddingMax-paddingMin) + paddingMin
+	} else if paddingMin < 1 {
+		paddingSize = rand.Intn(1) + 1
+	} else {
+		paddingSize = rand.Intn(paddingMin) + paddingMin
 	}
 
-	utlsConn := tls.UClient(plainConn, config, tls.HelloCustom)
+	tlsConn := tls.UClient(plainConn, cfg, tls.HelloCustom)
 	spec := tls.ClientHelloSpec{
 		TLSVersMax: tls.VersionTLS13,
 		TLSVersMin: tls.VersionTLS10,
@@ -179,19 +175,19 @@ func (d *Dialer) makeTLSHelloPacketWithPadding(plainConn net.Conn, config *tls.C
 		},
 		GetSessionID: nil,
 	}
-	err := utlsConn.ApplyPreset(&spec)
+	err := tlsConn.ApplyPreset(&spec)
 
 	if err != nil {
 		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
 	}
 
-	err = utlsConn.Handshake()
+	err = tlsConn.Handshake()
 
 	if err != nil {
 		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
 	}
 
-	return utlsConn, nil
+	return tlsConn, nil
 }
 
 func removeProtocolFromALPN(spec *tls.ClientHelloSpec, protocol string) *tls.ClientHelloSpec {
@@ -210,7 +206,7 @@ func removeProtocolFromALPN(spec *tls.ClientHelloSpec, protocol string) *tls.Cli
 }
 
 // TLSDial dials a TLS connection.
-func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr string) (net.Conn, error) {
+func TLSDial(plainDialer PlainTCPDial, network, addr string) (net.Conn, error) {
 	sni, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -228,42 +224,43 @@ func (d *Dialer) TLSDial(plainDialer PlainTCPDial, network, addr string) (net.Co
 		tls.HelloEdge_Auto,
 		tls.HelloSafari_Auto,
 		tls.HelloIOS_Auto,
+		tls.HelloAndroid_11_OkHttp,
 	}
 	randomFingerprint = modernFingerprints[rand.Intn(len(modernFingerprints))]
 
-	config := tls.Config{
+	cfg := tls.Config{
 		ServerName:         sni,
 		InsecureSkipVerify: true,
 		NextProtos:         nil,
 		MinVersion:         tls.VersionTLS10,
 	}
 
-	var utlsClient *tls.UConn
+	var tlsClient *tls.UConn
 
-	if d.TLSPaddingEnabled {
-		utlsConn, handshakeErr := d.makeTLSHelloPacketWithPadding(plainConn, &config, sni)
+	if config.Tls.Padding.Enabled {
+		tlsConn, handshakeErr := makeTLSHelloPacketWithPadding(plainConn, &cfg, sni)
 		if handshakeErr != nil {
 			_ = plainConn.Close()
-			fmt.Println(handshakeErr)
+			logger.Errorf("tls padding error %v", handshakeErr)
 			return nil, handshakeErr
 		}
-		return utlsConn, nil
+		return tlsConn, nil
 	}
 
-	utlsClient = tls.UClient(plainConn, &config, tls.HelloCustom)
+	tlsClient = tls.UClient(plainConn, &cfg, tls.HelloCustom)
 
 	spec, _ := tls.UTLSIdToSpec(randomFingerprint)
 
-	err = utlsClient.ApplyPreset(removeProtocolFromALPN(&spec, "h2"))
+	err = tlsClient.ApplyPreset(removeProtocolFromALPN(&spec, "h2"))
 	if err != nil {
 		return nil, err
 	}
 
-	err = utlsClient.Handshake()
+	err = tlsClient.Handshake()
 	if err != nil {
 		_ = plainConn.Close()
-		fmt.Println(err)
+		logger.Errorf("tls handshake error %v", err)
 		return nil, err
 	}
-	return utlsClient, nil
+	return tlsClient, nil
 }

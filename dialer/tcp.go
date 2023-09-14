@@ -3,6 +3,7 @@
 package dialer
 
 import (
+	"bepass/config"
 	"bepass/logger"
 	"bepass/protect"
 	"net"
@@ -11,7 +12,7 @@ import (
 )
 
 // TCPDial connects to the destination address.
-func (d *Dialer) TCPDial(network, addr string) (*net.TCPConn, error) {
+func TCPDial(network, addr string) (*net.TCPConn, error) {
 	var (
 		tcpAddr *net.TCPAddr
 		err     error
@@ -20,9 +21,8 @@ func (d *Dialer) TCPDial(network, addr string) (*net.TCPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	if d.EnableLowLevelSockets && (runtime.GOOS == "android" || runtime.GOOS == "linux") {
-		dialer := protect.NewClientDialer()
-		conn, err := dialer.Dial("tcp", net.JoinHostPort(tcpAddr.IP.String(), strconv.Itoa(tcpAddr.Port)))
+	if config.Unix.ProtectSockets && (runtime.GOOS == "android" || runtime.GOOS == "linux") {
+		conn, err := protect.NewClientDialer().Dial("tcp", net.JoinHostPort(tcpAddr.IP.String(), strconv.Itoa(tcpAddr.Port)))
 		if err != nil {
 			return nil, err
 		}
