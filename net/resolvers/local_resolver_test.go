@@ -1,6 +1,6 @@
 // local_resolver_test.go
 
-package resolve
+package resolvers
 
 import (
 	"testing"

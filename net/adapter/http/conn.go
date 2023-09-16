@@ -1,8 +1,8 @@
 package http
 
 import (
-	"bepass/logger"
-	"bepass/sni"
+	"bepass/pkg/logger"
+	"bepass/pkg/sni"
 	"bytes"
 	"net"
 	"sync"

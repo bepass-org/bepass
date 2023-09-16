@@ -2,7 +2,7 @@ package fragment
 
 import (
 	"bepass/config"
-	"bepass/sni"
+	"bepass/pkg/sni"
 	"bytes"
 	"math/rand"
 	"net"

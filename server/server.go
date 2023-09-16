@@ -1,10 +1,10 @@
 package server
 
 import (
-	"bepass/bufferpool"
 	"bepass/config"
 	"bepass/doh"
-	"bepass/resolve"
+	"bepass/net/resolvers"
+	"bepass/pkg/bufferpool"
 	"bepass/socks5"
 	"bepass/transport"
 	"context"
@@ -18,7 +18,7 @@ import (
 var s5 *socks5.Server
 
 func Run(captureCTRLC bool) error {
-	localResolver := &resolve.LocalResolver{
+	localResolver := &resolvers.LocalResolver{
 		Hosts: config.Dns.Hosts,
 	}
 

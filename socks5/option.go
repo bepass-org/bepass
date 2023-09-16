@@ -5,7 +5,7 @@
 package socks5
 
 import (
-	"bepass/bufferpool"
+	"bepass/pkg/bufferpool"
 	"context"
 	"io"
 	"net"

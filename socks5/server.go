@@ -4,8 +4,8 @@
 package socks5
 
 import (
-	"bepass/bufferpool"
-	"bepass/logger"
+	"bepass/pkg/bufferpool"
+	"bepass/pkg/logger"
 	"bepass/socks5/statute"
 	"bufio"
 	"bytes"

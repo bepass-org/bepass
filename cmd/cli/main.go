@@ -3,7 +3,7 @@ package main
 
 import (
 	"bepass/config"
-	"bepass/logger"
+	"bepass/pkg/logger"
 	"bepass/server"
 	"errors"
 	"flag"

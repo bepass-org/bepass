@@ -4,8 +4,8 @@ package dialer
 
 import (
 	"bepass/config"
-	"bepass/logger"
-	"bepass/protect"
+	"bepass/pkg/logger"
+	"bepass/pkg/protect"
 	"net"
 	"runtime"
 	"strconv"

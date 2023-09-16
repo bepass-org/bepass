@@ -1,5 +1,5 @@
 // Package resolve provides DNS resolution and host file management functionality.
-package resolve
+package resolvers
 
 // CheckHosts checks if a given domain exists in the local resolver's hosts file
 // and returns the corresponding IP address if found, or an empty string if not.

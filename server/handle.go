@@ -1,17 +1,17 @@
 package server
 
 import (
-	"bepass/cache"
 	"bepass/config"
 	"bepass/dialer"
 	"bepass/doh"
-	"bepass/logger"
-	"bepass/resolve"
-	"bepass/sni"
+	"bepass/net/resolvers"
+	"bepass/pkg/cache"
+	"bepass/pkg/logger"
+	sni2 "bepass/pkg/sni"
+	"bepass/pkg/utils"
 	"bepass/socks5"
 	"bepass/socks5/statute"
 	"bepass/transport"
-	"bepass/utils"
 	"bytes"
 	"context"
 	"fmt"
@@ -29,16 +29,16 @@ import (
 
 type Server struct {
 	DoHClient     *doh.Client
-	LocalResolver *resolve.LocalResolver
+	LocalResolver *resolvers.LocalResolver
 	Transport     *transport.Transport
 }
 
 // extractHostnameOrChangeHTTPHostHeader This function extracts the tls sni or http
 func (s *Server) extractHostnameOrChangeHTTPHostHeader(data []byte) (
 	hostname []byte, firstPacketData []byte, isHTTP bool, err error) {
-	hello, err := sni.ReadClientHello(bytes.NewReader(data))
+	hello, err := sni2.ReadClientHello(bytes.NewReader(data))
 	if err != nil {
-		host, httpPacketData, err := sni.ParseHTTPHost(bytes.NewReader(data))
+		host, httpPacketData, err := sni2.ParseHTTPHost(bytes.NewReader(data))
 		if err != nil {
 			return nil, data, false, err
 		}

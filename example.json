@@ -7,15 +7,13 @@
   "tls": {
     "padding": {
       "enabled": false,
-      "settings": {
-        "length": [
-          40,
-          80
-        ]
-      }
+      "length": [
+        40,
+        80
+      ]
     },
     "allow_insecure": true,
-    "fingerprint": "chrome|edge|firefox|safari|ios|android"
+    "fingerprint": "chrome|edge|firefox|safari|ios|android|auto"
   },
   "fragment": {
     "enable": true,
@@ -40,20 +38,22 @@
     }
   },
   "dns": {
-    "strategy": "remote|local",
-    "prefer": "v4|v6|both",
+    "strategy": "direct|proxy",
+    "prefer": "ipv4|ipv6|auto",
     "type": "doh|dot|sdns",
     "address": "https://dns.rotunneling.net/dns-query/public",
-    "ttl": "300",
+    "ttl": 300,
     "timeout": "10",
     "fragment": false,
-    "hosts": {
-      "domain": "dns.rotunneling.net",
-      "ip": "172.66.42.222"
-    }
+    "hosts": [
+      {
+        "domain": "dns.rotunneling.net",
+        "ip": "172.66.42.222"
+      }
+    ]
   },
   "worker": {
-    "enable": "true",
+    "enable": true,
     "sni": "worker_name.user.workers.dev",
     "host": "<ip>:<port>",
     "scanner": false
@@ -64,6 +64,6 @@
     "timeout": 120
   },
   "unix": {
-    "sockets": "protected|normal"
+    "protected": false
   }
 }

@@ -1,12 +1,53 @@
 package config
 
 import (
-	"bepass/logger"
-	"bepass/utils"
+	"bepass/pkg/logger"
+	"bepass/pkg/utils"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
+)
+
+var (
+	availableFragmentModes = []string{
+		// weak|strong|aggressive|custom|advanced
+		"weak",
+		"strong",
+		"aggressive",
+		"custom",
+		"advanced",
+	}
+	availableTLSFingerPrints = []string{
+		// chrome|edge|firefox|safari|ios|android|auto
+		"chrome",
+		"edge",
+		"firefox",
+		"safari",
+		"ios",
+		"android",
+		"auto",
+	}
+	availableDNSStrategies = []string{
+		// direct|proxy
+		"direct",
+		"proxy",
+	}
+	availableDNSPrefer = []string{
+		// ipv4|ipv6|auto
+		"ipv4",
+		"ipv6",
+		"auto",
+	}
+	availableDNSTypes = []string{
+		// udp|tcp|dot|doh|crypt|system
+		"udp",
+		"tcp",
+		"dot",
+		"doh",
+		"crypt",
+		"system",
+	}
 )
 
 type server struct {
@@ -37,8 +78,8 @@ type fragment struct {
 
 // Hosts represents a domain-to-IP mapping entry in the local hosts file.
 type Hosts struct {
-	Domain string
-	IP     string
+	Domain string `json:"domain"`
+	IP     string `json:"ip"`
 }
 
 type dns struct {
@@ -66,7 +107,7 @@ type udp struct {
 }
 
 type unix struct {
-	ProtectSockets bool `json:"sockets"`
+	Protected bool `json:"protected"`
 }
 
 type session struct {

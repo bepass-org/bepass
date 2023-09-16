@@ -4,8 +4,8 @@ package transport
 import (
 	"bepass/config"
 	"bepass/dialer"
-	"bepass/logger"
 	"bepass/net/adapter/ws"
+	"bepass/pkg/logger"
 	"context"
 	"encoding/binary"
 	"net"

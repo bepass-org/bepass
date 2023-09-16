@@ -4,7 +4,7 @@ package dialer
 
 import (
 	"bepass/config"
-	"bepass/logger"
+	"bepass/pkg/logger"
 	"fmt"
 	tls "github.com/refraction-networking/utls"
 	"io"

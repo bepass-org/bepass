@@ -1,5 +1,5 @@
 // Package resolve provides DNS resolution and host file management functionality.
-package resolve
+package resolvers
 
 import (
 	"bepass/config"

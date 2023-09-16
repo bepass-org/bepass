@@ -4,8 +4,8 @@ package doh
 import (
 	"bepass/config"
 	"bepass/dialer"
-	"bepass/logger"
-	"bepass/resolve"
+	"bepass/net/resolvers"
+	"bepass/pkg/logger"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -17,7 +17,7 @@ import (
 
 // Client represents a DNS-over-HTTPS (DoH) client.
 type Client struct {
-	LocalResolver *resolve.LocalResolver
+	LocalResolver *resolvers.LocalResolver
 }
 
 // HTTPClient performs an HTTP GET request to the given address using the configured client.

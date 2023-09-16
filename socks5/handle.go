@@ -4,7 +4,7 @@
 package socks5
 
 import (
-	"bepass/logger"
+	"bepass/pkg/logger"
 	"bepass/socks5/statute"
 	"context"
 	"fmt"

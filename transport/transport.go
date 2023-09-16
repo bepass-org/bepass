@@ -2,13 +2,13 @@
 package transport
 
 import (
-	"bepass/bufferpool"
 	"bepass/config"
-	"bepass/logger"
 	"bepass/net/adapter/ws"
+	"bepass/pkg/bufferpool"
+	"bepass/pkg/logger"
+	"bepass/pkg/utils"
 	"bepass/socks5"
 	"bepass/socks5/statute"
-	"bepass/utils"
 	"fmt"
 	"io"
 	"net"
@@ -41,7 +41,7 @@ type UDPPacket struct {
 
 // TunnelTCP handles tcp network traffic.
 func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
-	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "tcp")
+	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "tcp", config.Session.SessionID)
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
@@ -111,7 +111,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 		return err
 	}
 
-	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "udp")
+	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "udp", config.Session.SessionID)
 	if err != nil {
 		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
 			return err
