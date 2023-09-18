@@ -1,10 +1,9 @@
 package server
 
 import (
-	"bepass/doh"
 	"bepass/pkg/dialer"
 	"bepass/pkg/logger"
-	resolvers2 "bepass/pkg/net/resolvers"
+	"bepass/pkg/net/resolvers"
 	sni2 "bepass/pkg/sni"
 	"bepass/pkg/utils"
 	"bepass/socks5"
@@ -19,9 +18,7 @@ import (
 )
 
 type Server struct {
-	DoHClient     *doh.Client
-	LocalResolver *resolvers2.LocalResolver
-	Transport     *transport.Transport
+	Transport *transport.Transport
 }
 
 // extractHostnameOrChangeHTTPHostHeader This function extracts the tls sni or http
@@ -157,7 +154,7 @@ func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (*st
 	dest := req.RawDestAddr
 
 	if dest.FQDN != "" {
-		ip, err := resolvers2.Resolve(dest.FQDN)
+		ip, err := resolvers.Resolve(dest.FQDN)
 		if err != nil {
 			return nil, err
 		}
