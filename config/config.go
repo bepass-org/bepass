@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"time"
 )
 
 var (
@@ -32,12 +33,6 @@ var (
 		// direct|proxy
 		"direct",
 		"proxy",
-	}
-	availableDNSPrefer = []string{
-		// ipv4|ipv6|auto
-		"ipv4",
-		"ipv6",
-		"auto",
 	}
 	availableDNSTypes = []string{
 		// udp|tcp|dot|doh|crypt|system
@@ -83,12 +78,20 @@ type Hosts struct {
 }
 
 type dns struct {
-	Strategy string  `json:"strategy"`
+	Strategy string `json:"strategy"`
+	Settings struct {
+		UseIPv4            bool
+		UseIPv6            bool
+		SearchList         []string
+		Ndots              int
+		Timeout            time.Duration
+		InsecureSkipVerify bool
+		TLSHostname        string
+	} `json:"settings"`
 	Prefer   string  `json:"prefer"`
 	Type     string  `json:"type"`
 	Address  string  `json:"address"`
 	Ttl      int     `json:"ttl"`
-	Timeout  string  `json:"timeout"`
 	Fragment bool    `json:"fragment"`
 	Hosts    []Hosts `json:"hosts"`
 }

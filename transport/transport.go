@@ -3,9 +3,9 @@ package transport
 
 import (
 	"bepass/config"
-	"bepass/net/adapter/ws"
 	"bepass/pkg/bufferpool"
 	"bepass/pkg/logger"
+	"bepass/pkg/net/adapters/ws"
 	"bepass/pkg/utils"
 	"bepass/socks5"
 	"bepass/socks5/statute"

@@ -3,9 +3,9 @@ package transport
 
 import (
 	"bepass/config"
-	"bepass/dialer"
-	"bepass/net/adapter/ws"
+	dialer2 "bepass/pkg/dialer"
 	"bepass/pkg/logger"
+	"bepass/pkg/net/adapters/ws"
 	"context"
 	"encoding/binary"
 	"net"
@@ -31,12 +31,12 @@ type WSTunnel struct {
 func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	d := websocket.Dialer{
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer.HttpDial(network, config.Worker.Host)
+			return dialer2.HttpDial(network, config.Worker.Host)
 		},
 
 		NetDialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer.TLSDial(func(network, addr string) (net.Conn, error) {
-				return dialer.FragmentDial(network, config.Worker.Host)
+			return dialer2.TLSDial(func(network, addr string) (net.Conn, error) {
+				return dialer2.FragmentDial(network, config.Worker.Host)
 			}, network, addr)
 		},
 	}

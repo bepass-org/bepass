@@ -2,8 +2,6 @@ package server
 
 import (
 	"bepass/config"
-	"bepass/doh"
-	"bepass/net/resolvers"
 	"bepass/pkg/bufferpool"
 	"bepass/socks5"
 	"bepass/transport"
@@ -18,10 +16,6 @@ import (
 var s5 *socks5.Server
 
 func Run(captureCTRLC bool) error {
-	localResolver := &resolvers.LocalResolver{
-		Hosts: config.Dns.Hosts,
-	}
-
 	wsTunnel := &transport.WSTunnel{
 		EstablishedTunnels: make(map[string]*transport.EstablishedTunnel),
 	}
@@ -31,14 +25,8 @@ func Run(captureCTRLC bool) error {
 		Tunnel:     wsTunnel,
 	}
 
-	dohClient := &doh.Client{
-		LocalResolver: localResolver,
-	}
-
 	serverHandler := &Server{
-		DoHClient:     dohClient,
-		LocalResolver: localResolver,
-		Transport:     tunnelTransport,
+		Transport: tunnelTransport,
 	}
 
 	if captureCTRLC {

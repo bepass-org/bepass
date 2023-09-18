@@ -1,12 +1,11 @@
 package resolvers
 
 import (
+	"bepass/pkg/dnscrypt"
+	"bepass/pkg/logger"
 	"bepass/pkg/utils"
-	"time"
-
-	"bepass/utils/dnscrypt"
 	"github.com/miekg/dns"
-	"github.com/sirupsen/logrus"
+	"time"
 )
 
 // DNSCryptResolver represents the config options for setting up a Resolver.
@@ -47,14 +46,14 @@ func NewDNSCryptResolver(server string, dnscryptOpts DNSCryptResolverOpts, resol
 func (r *DNSCryptResolver) Lookup(question dns.Question) (Response, error) {
 	var (
 		rsp      Response
-		messages = utils.prepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
+		messages = utils.PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
 	)
 	for _, msg := range messages {
-		r.resolverOptions.Logger.WithFields(logrus.Fields{
-			"domain":     msg.Question[0].Name,
-			"ndots":      r.resolverOptions.Ndots,
-			"nameserver": r.server,
-		}).Debug("Attempting to resolve")
+		logger.Infof("attempting to resolve %s, ns: %s, ndots: %s",
+			msg.Question[0].Name,
+			r.server,
+			r.resolverOptions.Ndots,
+		)
 		now := time.Now()
 		in, err := r.client.Exchange(&msg, r.resolverInfo)
 		if err != nil {
@@ -71,7 +70,7 @@ func (r *DNSCryptResolver) Lookup(question dns.Question) (Response, error) {
 			rsp.Questions = append(rsp.Questions, ques)
 		}
 		// get the authorities and answers.
-		output := utils.parseMessage(in, rtt, r.server)
+		output := utils.ParseMessage(in, rtt, r.server)
 		rsp.Authorities = output.Authorities
 		rsp.Answers = output.Answers
 

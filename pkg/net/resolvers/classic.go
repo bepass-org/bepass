@@ -1,12 +1,12 @@
 package resolvers
 
 import (
+	"bepass/pkg/logger"
 	"bepass/pkg/utils"
 	"crypto/tls"
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/sirupsen/logrus"
 )
 
 // ClassicResolver represents the config options for setting up a Resolver.
@@ -64,14 +64,15 @@ func NewClassicResolver(server string, classicOpts ClassicResolverOpts, resolver
 func (r *ClassicResolver) Lookup(question dns.Question) (Response, error) {
 	var (
 		rsp      Response
-		messages = utils.prepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
+		messages = utils.PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
 	)
 	for _, msg := range messages {
-		r.resolverOptions.Logger.WithFields(logrus.Fields{
-			"domain":     msg.Question[0].Name,
-			"ndots":      r.resolverOptions.Ndots,
-			"nameserver": r.server,
-		}).Debug("Attempting to resolve")
+
+		logger.Infof("attempting to resolve %s, ns: %s, ndots: %s",
+			msg.Question[0].Name,
+			r.server,
+			r.resolverOptions.Ndots,
+		)
 
 		// Since the library doesn't include tcp.Dial time,
 		// it's better to not rely on `rtt` provided here and calculate it ourselves.
@@ -82,6 +83,7 @@ func (r *ClassicResolver) Lookup(question dns.Question) (Response, error) {
 		}
 
 		// In case the response size exceeds 512 bytes (can happen with lot of TXT records),
+
 		// fallback to TCP as with UDP the response is truncated. Fallback mechanism is in-line with `dig`.
 		if in.Truncated {
 			switch r.client.Net {
@@ -94,7 +96,9 @@ func (r *ClassicResolver) Lookup(question dns.Question) (Response, error) {
 			default:
 				r.client.Net = "tcp"
 			}
-			r.resolverOptions.Logger.WithField("protocol", r.client.Net).Debug("Response truncated; retrying now")
+			logger.Infof("response truncated; retrying now, protocol: %s",
+				r.client.Net,
+			)
 			return r.Lookup(question)
 		}
 
@@ -110,7 +114,7 @@ func (r *ClassicResolver) Lookup(question dns.Question) (Response, error) {
 		rtt := time.Since(now)
 
 		// Get the authorities and answers.
-		output := utils.parseMessage(in, rtt, r.server)
+		output := utils.ParseMessage(in, rtt, r.server)
 		rsp.Authorities = output.Authorities
 		rsp.Answers = output.Answers
 

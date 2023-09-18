@@ -10,10 +10,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 // MakeHTTPClient creates an HTTP client with custom dialing behavior.
-func MakeHTTPClient(enableProxy bool) *http.Client {
+func MakeHTTPClient(enableProxy bool, timeout time.Duration) *http.Client {
 	transport := &http.Transport{
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 		ForceAttemptHTTP2: false,
@@ -32,5 +33,8 @@ func MakeHTTPClient(enableProxy bool) *http.Client {
 		// Create dialer
 		transport.Proxy = http.ProxyURL(proxyURL)
 	}
-	return &http.Client{Transport: transport}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+	}
 }

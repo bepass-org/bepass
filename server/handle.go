@@ -1,12 +1,10 @@
 package server
 
 import (
-	"bepass/config"
-	"bepass/dialer"
 	"bepass/doh"
-	"bepass/net/resolvers"
-	"bepass/pkg/cache"
+	"bepass/pkg/dialer"
 	"bepass/pkg/logger"
+	resolvers2 "bepass/pkg/net/resolvers"
 	sni2 "bepass/pkg/sni"
 	"bepass/pkg/utils"
 	"bepass/socks5"
@@ -14,22 +12,15 @@ import (
 	"bepass/transport"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/ameshkov/dnscrypt/v2"
-
-	"github.com/miekg/dns"
 )
 
 type Server struct {
 	DoHClient     *doh.Client
-	LocalResolver *resolvers.LocalResolver
+	LocalResolver *resolvers2.LocalResolver
 	Transport     *transport.Transport
 }
 
@@ -166,7 +157,7 @@ func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (*st
 	dest := req.RawDestAddr
 
 	if dest.FQDN != "" {
-		ip, err := s.Resolve(dest.FQDN)
+		ip, err := resolvers2.Resolve(dest.FQDN)
 		if err != nil {
 			return nil, err
 		}
@@ -177,115 +168,4 @@ func (s *Server) resolveDestination(_ context.Context, req *socks5.Request) (*st
 	}
 
 	return dest, nil
-}
-
-// Resolve resolves the FQDN to an IP address using the specified resolution mechanism.
-func (s *Server) Resolve(fqdn string) (string, error) {
-	if config.Worker.Enable &&
-		strings.Contains(config.Worker.Sni, fqdn) {
-		dh, _, err := net.SplitHostPort(config.Worker.Host)
-		if strings.Contains(dh, ":") {
-			// its ipv6
-			dh = "[" + dh + "]"
-		}
-		if err != nil {
-			return "", err
-		}
-		return dh, nil
-	}
-
-	if h := s.LocalResolver.CheckHosts(fqdn); h != "" {
-		return h, nil
-	}
-
-	if config.Dns.Type == "doh" {
-		u, err := url.Parse(config.Dns.Address)
-		if err == nil {
-			if u.Hostname() == fqdn {
-				return s.LocalResolver.Resolve(u.Hostname()), nil
-			}
-		}
-	}
-
-	// Ensure fqdn ends with a period
-	if !strings.HasSuffix(fqdn, ".") {
-		fqdn += "."
-	}
-
-	// Check the cache for fqdn
-	if cachedValue, _ := cache.Get(fqdn); cachedValue != nil {
-		logger.Infof("using cached value for %s", fqdn)
-		return cachedValue.(string), nil
-	}
-
-	// Build request message
-	req := dns.Msg{}
-	req.Id = dns.Id()
-	req.RecursionDesired = true
-	req.Question = []dns.Question{{
-		Name:   fqdn,
-		Qtype:  dns.TypeA,
-		Qclass: dns.ClassINET,
-	}}
-
-	// Determine which DNS resolution mechanism to use
-	var exchange *dns.Msg
-	var err error
-	switch config.Dns.Type {
-	case "doh":
-		exchange, err = s.resolveDNSWithDOH(&req)
-	default:
-		exchange, err = s.resolveDNSWithDNSCrypt(&req)
-	}
-	if err != nil {
-		return "", err
-	}
-	// Parse answer and store in cache
-	answer := exchange.Answer[0]
-	logger.Infof("resolved %s to %s", fqdn, strings.Replace(answer.String(), "\t", " ", -1))
-	record := strings.Fields(answer.String())
-	if record[3] == "CNAME" {
-		ip, err := s.Resolve(record[4])
-		if err != nil {
-			return "", err
-		}
-		cache.Set(fqdn, ip)
-		return ip, nil
-	}
-	ip := record[4]
-	cache.Set(fqdn, ip)
-	return ip, nil
-}
-
-// resolveDNSWithDOH resolves DNS using DNS-over-HTTP (DoH) client.
-func (s *Server) resolveDNSWithDOH(req *dns.Msg) (*dns.Msg, error) {
-	dnsAddr := config.Dns.Address
-
-	exchange, _, err := s.DoHClient.Exchange(req, dnsAddr)
-	if err != nil {
-		return nil, err
-	}
-	if len(exchange.Answer) == 0 {
-		return nil, fmt.Errorf("no answer")
-	}
-	return exchange, nil
-}
-
-// resolveDNSWithDNSCrypt resolves DNS using DNSCrypt client.
-func (s *Server) resolveDNSWithDNSCrypt(req *dns.Msg) (*dns.Msg, error) {
-	c := dnscrypt.Client{
-		Net: "tcp", Timeout: 10 * time.Second,
-	}
-	resolverInfo, err := c.Dial(config.Dns.Address)
-	if err != nil {
-		return nil, err
-	}
-	exchange, err := c.Exchange(req, resolverInfo)
-	if err != nil {
-		return nil, err
-	}
-	if len(exchange.Answer) == 0 {
-		return nil, fmt.Errorf("no answer")
-	}
-	return exchange, nil
 }

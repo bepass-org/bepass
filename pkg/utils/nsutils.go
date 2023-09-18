@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"bepass/net/resolvers"
+	"bepass/pkg/net/resolvers"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,9 +10,9 @@ import (
 	"github.com/miekg/dns"
 )
 
-// prepareMessages takes a  DNS Question and returns the
+// PrepareMessages takes a  DNS Question and returns the
 // corresponding DNS messages for the same.
-func prepareMessages(q dns.Question, ndots int, searchList []string) []dns.Msg {
+func PrepareMessages(q dns.Question, ndots int, searchList []string) []dns.Msg {
 	var (
 		possibleQNames = constructPossibleQuestions(q.Name, ndots, searchList)
 		messages       = make([]dns.Msg, 0, len(possibleQNames))
@@ -69,9 +69,9 @@ func constructPossibleQuestions(name string, ndots int, searchList []string) []s
 	return names
 }
 
-// parseMessage takes a `dns.Message` and returns a custom
+// ParseMessage takes a `dns.Message` and returns a custom
 // Response data struct.
-func parseMessage(msg *dns.Msg, rtt time.Duration, server string) resolvers.Response {
+func ParseMessage(msg *dns.Msg, rtt time.Duration, server string) resolvers.Response {
 	var resp resolvers.Response
 	timeTaken := fmt.Sprintf("%dms", rtt.Milliseconds())
 

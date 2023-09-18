@@ -21,7 +21,7 @@ func TCPDial(network, addr string) (*net.TCPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	if config.Unix.ProtectSockets && (runtime.GOOS == "android" || runtime.GOOS == "linux") {
+	if config.Unix.Protected && (runtime.GOOS == "android" || runtime.GOOS == "linux") {
 		conn, err := protect.NewClientDialer().Dial("tcp", net.JoinHostPort(tcpAddr.IP.String(), strconv.Itoa(tcpAddr.Port)))
 		if err != nil {
 			return nil, err

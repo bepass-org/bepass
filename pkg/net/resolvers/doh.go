@@ -1,17 +1,19 @@
 package resolvers
 
 import (
+	"bepass/config"
+	"bepass/pkg/dialer"
+	"bepass/pkg/logger"
 	"bepass/pkg/utils"
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/sirupsen/logrus"
 )
 
 // DOHResolver represents the config options for setting up a DOH based resolver.
@@ -31,9 +33,7 @@ func NewDOHResolver(server string, resolverOpts Options) (Resolver, error) {
 	if u.Scheme != "https" {
 		return nil, fmt.Errorf("missing https in %s", server)
 	}
-	httpClient := &http.Client{
-		Timeout: resolverOpts.Timeout,
-	}
+	httpClient := dialer.MakeHTTPClient(config.Worker.Enable, resolverOpts.Timeout)
 	return &DOHResolver{
 		client:          httpClient,
 		server:          server,
@@ -46,15 +46,15 @@ func NewDOHResolver(server string, resolverOpts Options) (Resolver, error) {
 func (r *DOHResolver) Lookup(question dns.Question) (Response, error) {
 	var (
 		rsp      Response
-		messages = utils.prepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
+		messages = utils.PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
 	)
 
 	for _, msg := range messages {
-		r.resolverOptions.Logger.WithFields(logrus.Fields{
-			"domain":     msg.Question[0].Name,
-			"ndots":      r.resolverOptions.Ndots,
-			"nameserver": r.server,
-		}).Debug("Attempting to resolve")
+		logger.Infof("attempting to resolve %s, ns: %s, ndots: %s",
+			msg.Question[0].Name,
+			r.server,
+			r.resolverOptions.Ndots,
+		)
 		// get the DNS Message in wire format.
 		b, err := msg.Pack()
 		if err != nil {
@@ -67,12 +67,12 @@ func (r *DOHResolver) Lookup(question dns.Question) (Response, error) {
 			return rsp, err
 		}
 		if resp.StatusCode == http.StatusMethodNotAllowed {
-			url, err := url.Parse(r.server)
+			targetUrl, err := url.Parse(r.server)
 			if err != nil {
 				return rsp, err
 			}
-			url.RawQuery = fmt.Sprintf("dns=%v", base64.RawURLEncoding.EncodeToString(b))
-			resp, err = r.client.Get(url.String())
+			targetUrl.RawQuery = fmt.Sprintf("dns=%v", base64.RawURLEncoding.EncodeToString(b))
+			resp, err = r.client.Get(targetUrl.String())
 			if err != nil {
 				return rsp, err
 			}
@@ -81,16 +81,8 @@ func (r *DOHResolver) Lookup(question dns.Question) (Response, error) {
 			return rsp, fmt.Errorf("error from nameserver %s", resp.Status)
 		}
 		rtt := time.Since(now)
-		// if debug, extract the response headers
-		if r.resolverOptions.Logger.IsLevelEnabled(logrus.DebugLevel) {
-			for header, value := range resp.Header {
-				r.resolverOptions.Logger.WithFields(logrus.Fields{
-					header: value,
-				}).Debug("DOH response header")
-			}
-		}
 		// extract the binary response in DNS Message.
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return rsp, err
 		}
@@ -109,7 +101,7 @@ func (r *DOHResolver) Lookup(question dns.Question) (Response, error) {
 			rsp.Questions = append(rsp.Questions, ques)
 		}
 		// get the authorities and answers.
-		output := utils.parseMessage(&msg, rtt, r.server)
+		output := utils.ParseMessage(&msg, rtt, r.server)
 		rsp.Authorities = output.Authorities
 		rsp.Answers = output.Answers
 
