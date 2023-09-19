@@ -1,11 +1,11 @@
 package local
 
 import (
-	"bepass/local/proxy"
 	"bepass/pkg/bufferpool"
 	"bepass/pkg/dialer"
 	"bepass/pkg/logger"
 	"bepass/pkg/net/resolvers"
+	"bepass/pkg/proxy"
 	"bepass/pkg/sni"
 	"bepass/pkg/utils"
 	"bepass/transport"
@@ -102,8 +102,8 @@ func (s *Server) HandleTCPTunnel(ctx context.Context, w io.Writer, req *proxy.Re
 	return s.Transport.TunnelTCP(w, r)
 }
 
-// handleAssociate is used to handle a connect command
-func (s *Server) handleAssociate(ctx context.Context, writer io.Writer, req *proxy.Request) error {
+// HandleAssociate is used to handle a connect command
+func (s *Server) HandleAssociate(ctx context.Context, writer io.Writer, req *proxy.Request) error {
 	var err error
 
 	dest, err := s.resolveDestination(ctx, req)

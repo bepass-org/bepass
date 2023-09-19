@@ -1,6 +1,4 @@
-// Package socks5 provides a SOCKS5 proxy server implementation with authentication
-// support, request handling, and connection management. It can serve as a proxy for
-// various network applications that support SOCKS5 proxies.
+// Package proxy provides a SOCKS5, SOCKS4/a and http proxy server implementation.
 package proxy
 
 import (
@@ -28,7 +26,7 @@ type GPool interface {
 // A Request represents a request received by a server, including authentication
 // details, addresses, and connection information.
 type Request struct {
-	Request
+	Socks5Request
 	// LocalAddr of the network server listener
 	LocalAddr net.Addr
 	// RemoteAddr of the network that sent the request
@@ -43,14 +41,14 @@ type Request struct {
 
 // ParseRequest creates a new Request from the TCP connection
 func ParseRequest(bufConn io.Reader) (*Request, error) {
-	hd, err := ParseRequest(bufConn)
+	hd, err := ParseSocks5Request(bufConn)
 	if err != nil {
 		return nil, err
 	}
 	return &Request{
-		Request:     hd,
-		RawDestAddr: &hd.DstAddr,
-		Reader:      bufConn,
+		Socks5Request: hd,
+		RawDestAddr:   &hd.DstAddr,
+		Reader:        bufConn,
 	}, nil
 }
 
@@ -61,11 +59,11 @@ func (sf *Server) handleRequest(write io.Writer, req *Request) error {
 	// Switch on the command
 	switch req.Command {
 	case CommandConnect:
-		return sf.userConnectHandle(ctx, write, req)
+		return sf.ConnectHandle(ctx, write, req)
 	case CommandBind:
-		return sf.userBindHandle(ctx, write, req)
+		return sf.BindHandle(ctx, write, req)
 	case CommandAssociate:
-		return sf.userAssociateHandle(ctx, write, req)
+		return sf.AssociateHandle(ctx, write, req)
 	default:
 		if err := SendReply(write, RepCommandNotSupported, nil); err != nil {
 			return fmt.Errorf("failed to send reply, %v", err)
@@ -86,14 +84,14 @@ type Server struct {
 	// goroutine pool
 	gPool GPool
 	// user's handle
-	userSocks4ConnectHandle func(ctx context.Context, writer io.Writer, request *Request) error
-	userConnectHandle       func(ctx context.Context, writer io.Writer, request *Request) error
-	userBindHandle          func(ctx context.Context, writer io.Writer, request *Request) error
-	userAssociateHandle     func(ctx context.Context, writer io.Writer, request *Request) error
-	done                    chan bool
-	listen                  net.Listener
-	httpProxyBindAddr       string
-	bindAddress             string
+	Socks4ConnectHandle func(ctx context.Context, writer io.Writer, request *Request) error
+	ConnectHandle       func(ctx context.Context, writer io.Writer, request *Request) error
+	BindHandle          func(ctx context.Context, writer io.Writer, request *Request) error
+	AssociateHandle     func(ctx context.Context, writer io.Writer, request *Request) error
+	done                chan bool
+	listen              net.Listener
+	httpProxyBindAddr   string
+	bindAddress         string
 }
 
 // NewServer creates a new Server
@@ -272,13 +270,13 @@ func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error
 		return fmt.Errorf("failed to read destination address, %w", err)
 	}
 
-	if request.Request.Command != CommandConnect &&
-		request.Request.Command != CommandBind &&
-		request.Request.Command != CommandAssociate {
+	if request.Socks5Request.Command != CommandConnect &&
+		request.Socks5Request.Command != CommandBind &&
+		request.Socks5Request.Command != CommandAssociate {
 		if err := SendReply(conn, RepCommandNotSupported, nil); err != nil {
 			return fmt.Errorf("failed to send reply, %v", err)
 		}
-		return fmt.Errorf("unrecognized command[%d]", request.Request.Command)
+		return fmt.Errorf("unrecognized command[%d]", request.Socks5Request.Command)
 	}
 
 	request.LocalAddr = conn.LocalAddr()
@@ -338,11 +336,11 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 	}
 
 	request := &Request{
-		Request:    Request{},
-		LocalAddr:  conn.LocalAddr(),
-		RemoteAddr: conn.RemoteAddr(),
-		DestAddr:   nil,
-		Reader:     bufConn,
+		Socks5Request: Socks5Request{},
+		LocalAddr:     conn.LocalAddr(),
+		RemoteAddr:    conn.RemoteAddr(),
+		DestAddr:      nil,
+		Reader:        bufConn,
 		RawDestAddr: &AddrSpec{
 			FQDN:     dstHost,
 			IP:       dstIP,
@@ -351,8 +349,8 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 		},
 	}
 
-	if sf.userSocks4ConnectHandle != nil {
-		return sf.userSocks4ConnectHandle(context.Background(), io.Writer(conn), request)
+	if sf.Socks4ConnectHandle != nil {
+		return sf.Socks4ConnectHandle(context.Background(), io.Writer(conn), request)
 	}
 	logger.Errorf("socks4/a without user defined handler is unsupported")
 	return errors.New("unsupported")

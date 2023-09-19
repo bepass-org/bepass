@@ -3,10 +3,10 @@ package transport
 
 import (
 	"bepass/config"
-	proxy "bepass/local/proxy"
 	"bepass/pkg/bufferpool"
 	"bepass/pkg/logger"
 	"bepass/pkg/net/adapters/ws"
+	proxy "bepass/pkg/proxy"
 	"bepass/pkg/utils"
 	"fmt"
 	"io"

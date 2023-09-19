@@ -1,4 +1,3 @@
-// Package statute provides functionality for handling SOCKS5 protocol authentication.
 package proxy
 
 import (
@@ -52,7 +51,7 @@ func ParseDatagram(b []byte) (da Datagram, err error) {
 	case ATYPIPv4:
 		headLen += net.IPv4len + 2
 		da.DstAddr.IP = net.IPv4(b[4], b[5], b[6], b[7])
-		da.DstAddr.Port = int(binary.BigEndian.Uint16((b[headLen-2:])))
+		da.DstAddr.Port = int(binary.BigEndian.Uint16(b[headLen-2:]))
 	case ATYPIPv6:
 		headLen += net.IPv6len + 2
 		if len(b) <= headLen {

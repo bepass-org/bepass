@@ -1,4 +1,3 @@
-// Package statute provides functionality for handling SOCKS5 protocol authentication.
 package proxy
 
 import (
@@ -8,7 +7,7 @@ import (
 	"net"
 )
 
-// Request represents the SOCKS5 request, it contains everything that is not payload
+// Socks5Request represents the SOCKS5 request, it contains everything that is not payload
 // The SOCKS5 request is formed as follows:
 //
 // +-----+-----+-------+------+----------+----------+
@@ -16,7 +15,7 @@ import (
 // +-----+-----+-------+------+----------+----------+
 // |  1  |  1  | X'00' |  1   | Variable |    2     |
 // +-----+-----+-------+------+----------+----------+
-type Request struct {
+type Socks5Request struct {
 	// Version of socks5 protocol for message
 	Version byte
 	// Socks Command "connect","bind","associate"
@@ -27,8 +26,8 @@ type Request struct {
 	DstAddr AddrSpec
 }
 
-// ParseRequest to request from io.Reader
-func ParseRequest(r io.Reader) (req Request, err error) {
+// ParseSocks5Request to request from io.Reader
+func ParseSocks5Request(r io.Reader) (req Socks5Request, err error) {
 	// Read the version and command
 	tmp := []byte{0, 0}
 	if _, err = io.ReadFull(r, tmp); err != nil {
@@ -78,7 +77,7 @@ func ParseRequest(r io.Reader) (req Request, err error) {
 }
 
 // Bytes returns a slice of request
-func (h Request) Bytes() (b []byte) {
+func (h Socks5Request) Bytes() (b []byte) {
 	var addr []byte
 
 	length := 6
@@ -114,7 +113,7 @@ func (h Request) Bytes() (b []byte) {
 type Reply struct {
 	// Version of socks5 protocol for message
 	Version byte
-	// Socks Response status"
+	// Socks Response status
 	Response byte
 	// Reserved byte
 	Reserved byte
@@ -146,53 +145,4 @@ func (sf Reply) Bytes() (b []byte) {
 	b = append(b, addr...)
 	b = append(b, byte(sf.BndAddr.Port>>8), byte(sf.BndAddr.Port))
 	return b
-}
-
-// ParseReply parse to reply from io.Reader
-func ParseReply(r io.Reader) (rep Reply, err error) {
-	// Read the version and command
-	tmp := []byte{0, 0}
-	if _, err = io.ReadFull(r, tmp); err != nil {
-		return rep, fmt.Errorf("failed to get reply version and command, %v", err)
-	}
-	rep.Version, rep.Response = tmp[0], tmp[1]
-	if rep.Version != VersionSocks5 {
-		return rep, fmt.Errorf("unrecognized SOCKS version[%d]", rep.Version)
-	}
-	// Read reserved and address type
-	if _, err = io.ReadFull(r, tmp); err != nil {
-		return rep, fmt.Errorf("failed to get reply RSV and address type, %v", err)
-	}
-	rep.Reserved, rep.BndAddr.AddrType = tmp[0], tmp[1]
-
-	switch rep.BndAddr.AddrType {
-	case ATYPDomain:
-		if _, err = io.ReadFull(r, tmp[:1]); err != nil {
-			return rep, fmt.Errorf("failed to get reply, %v", err)
-		}
-		domainLen := int(tmp[0])
-		addr := make([]byte, domainLen+2)
-		if _, err = io.ReadFull(r, addr); err != nil {
-			return rep, fmt.Errorf("failed to get reply, %v", err)
-		}
-		rep.BndAddr.FQDN = string(addr[:domainLen])
-		rep.BndAddr.Port = int(binary.BigEndian.Uint16(addr[domainLen:]))
-	case ATYPIPv4:
-		addr := make([]byte, net.IPv4len+2)
-		if _, err = io.ReadFull(r, addr); err != nil {
-			return rep, fmt.Errorf("failed to get reply, %v", err)
-		}
-		rep.BndAddr.IP = net.IPv4(addr[0], addr[1], addr[2], addr[3])
-		rep.BndAddr.Port = int(binary.BigEndian.Uint16(addr[net.IPv4len:]))
-	case ATYPIPv6:
-		addr := make([]byte, net.IPv6len+2)
-		if _, err = io.ReadFull(r, addr); err != nil {
-			return rep, fmt.Errorf("failed to get reply, %v", err)
-		}
-		rep.BndAddr.IP = addr[:net.IPv6len]
-		rep.BndAddr.Port = int(binary.BigEndian.Uint16(addr[net.IPv6len:]))
-	default:
-		return rep, ErrUnrecognizedAddrType
-	}
-	return rep, nil
 }

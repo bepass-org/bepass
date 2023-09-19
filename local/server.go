@@ -2,9 +2,8 @@ package local
 
 import (
 	"bepass/config"
-	proxy "bepass/local/proxy"
 	"bepass/pkg/bufferpool"
-	"bepass/proxy"
+	"bepass/pkg/proxy"
 	"bepass/transport"
 	"context"
 	"fmt"
@@ -41,26 +40,28 @@ func Run(captureCTRLC bool) error {
 	}
 
 	if config.Worker.Enable {
-		s5 = proxy.NewServer(
-			proxy.WithConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
-				return serverHandler.HandleTCPTunnel(ctx, w, req, true)
-			}),
-			proxy.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
-				return serverHandler.HandleTCPTunnel(ctx, w, req, false)
-			}),
-			proxy.WithAssociateHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
-				return serverHandler.HandleUDPTunnel(ctx, w, req)
-			}),
-		)
+		s5 = proxy.NewServer()
+		s5.ConnectHandle = func(ctx context.Context, w io.Writer, req *proxy.Request) error {
+			return serverHandler.HandleTCPTunnel(ctx, w, req, true)
+		}
+		s5.AssociateHandle = func(ctx context.Context, w io.Writer, req *proxy.Request) error {
+			return serverHandler.HandleUDPTunnel(ctx, w, req)
+		}
+		s5.Socks4ConnectHandle = func(ctx context.Context, w io.Writer, req *proxy.Request) error {
+			return serverHandler.HandleTCPTunnel(ctx, w, req, false)
+		}
+
 	} else {
-		s5 = proxy.NewServer(
-			proxy.WithConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
-				return serverHandler.HandleTCPFragment(ctx, w, req, true)
-			}),
-			proxy.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
-				return serverHandler.HandleTCPFragment(ctx, w, req, false)
-			}),
-		)
+		s5 = proxy.NewServer()
+		s5.ConnectHandle = func(ctx context.Context, w io.Writer, req *proxy.Request) error {
+			return serverHandler.HandleTCPFragment(ctx, w, req, true)
+		}
+		s5.AssociateHandle = func(ctx context.Context, w io.Writer, req *proxy.Request) error {
+			return serverHandler.HandleAssociate(ctx, w, req)
+		}
+		s5.Socks4ConnectHandle = func(ctx context.Context, w io.Writer, req *proxy.Request) error {
+			return serverHandler.HandleTCPFragment(ctx, w, req, false)
+		}
 	}
 
 	fmt.Println("Starting socks, http server:", config.Server.Bind)
