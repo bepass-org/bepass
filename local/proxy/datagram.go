@@ -1,5 +1,5 @@
 // Package statute provides functionality for handling SOCKS5 protocol authentication.
-package statute
+package proxy
 
 import (
 	"encoding/binary"

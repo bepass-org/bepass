@@ -1,12 +1,11 @@
 // Package socks5 provides a SOCKS5 proxy server implementation with authentication
 // support, request handling, and connection management. It can serve as a proxy for
 // various network applications that support SOCKS5 proxies.
-package socks5
+package proxy
 
 import (
 	"bepass/pkg/bufferpool"
 	"bepass/pkg/logger"
-	"bepass/socks5/statute"
 	"bufio"
 	"bytes"
 	"context"
@@ -18,6 +17,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"slices"
 )
 
 // GPool is used to implement custom goroutine pool default use goroutine
@@ -25,27 +25,58 @@ type GPool interface {
 	Submit(f func()) error
 }
 
+// A Request represents a request received by a server, including authentication
+// details, addresses, and connection information.
+type Request struct {
+	Request
+	// LocalAddr of the network server listener
+	LocalAddr net.Addr
+	// RemoteAddr of the network that sent the request
+	RemoteAddr net.Addr
+	// DestAddr of the actual destination (might be affected by rewrite)
+	DestAddr *AddrSpec
+	// Reader for the request's data
+	Reader io.Reader
+	// RawDestAddr of the desired destination
+	RawDestAddr *AddrSpec
+}
+
+// ParseRequest creates a new Request from the TCP connection
+func ParseRequest(bufConn io.Reader) (*Request, error) {
+	hd, err := ParseRequest(bufConn)
+	if err != nil {
+		return nil, err
+	}
+	return &Request{
+		Request:     hd,
+		RawDestAddr: &hd.DstAddr,
+		Reader:      bufConn,
+	}, nil
+}
+
+// handleRequest is used for request processing after authentication
+func (sf *Server) handleRequest(write io.Writer, req *Request) error {
+	ctx := context.Background()
+
+	// Switch on the command
+	switch req.Command {
+	case CommandConnect:
+		return sf.userConnectHandle(ctx, write, req)
+	case CommandBind:
+		return sf.userBindHandle(ctx, write, req)
+	case CommandAssociate:
+		return sf.userAssociateHandle(ctx, write, req)
+	default:
+		if err := SendReply(write, RepCommandNotSupported, nil); err != nil {
+			return fmt.Errorf("failed to send reply, %v", err)
+		}
+		return fmt.Errorf("unsupported command[%v]", req.Command)
+	}
+}
+
 // Server is responsible for accepting internet and handling
 // the details of the SOCKS5 protocol
 type Server struct {
-	// authMethods can be provided to implement authentication
-	// By default, "no-auth" mode is enabled.
-	// For password-based auth use UserPassAuthenticator.
-	authMethods []Authenticator
-	// If provided, username/password authentication is enabled,
-	// by appending a UserPassAuthenticator to AuthMethods. If not provided,
-	// and authMethods is nil, then "no-auth" mode is enabled.
-	credentials CredentialStore
-	// resolver can be provided to do custom name resolution.
-	// Defaults to DNSResolver if not provided.
-	resolver NameResolver
-	// rules is provided to enable custom logic around permitting
-	// various commands. If not provided, NewPermitAll is used.
-	rules RuleSet
-	// rewriter can be used to transparently rewrite addresses.
-	// This is invoked before the RuleSet is invoked.
-	// Defaults to NoRewrite.
-	rewriter AddressRewriter
 	// bindIP is used for bind or udp associate
 	bindIP net.IP
 	// Optional function for dialing out
@@ -66,30 +97,13 @@ type Server struct {
 }
 
 // NewServer creates a new Server
-func NewServer(opts ...Option) *Server {
-	srv := &Server{
-		authMethods: []Authenticator{},
-		bufferPool:  bufferpool.NewPool(32 * 1024),
-		resolver:    DNSResolver{},
-		rules:       NewPermitAll(),
+func NewServer() *Server {
+	return &Server{
+		bufferPool: bufferpool.NewPool(32 * 1024),
 		dial: func(ctx context.Context, net_, addr string) (net.Conn, error) {
 			return net.Dial(net_, addr)
 		},
 	}
-
-	for _, opt := range opts {
-		opt(srv)
-	}
-
-	// Ensure we have at least one authentication method enabled
-	if (len(srv.authMethods) == 0) && srv.credentials != nil {
-		srv.authMethods = []Authenticator{&UserPassAuthenticator{srv.credentials}}
-	}
-	if len(srv.authMethods) == 0 {
-		srv.authMethods = []Authenticator{&NoAuthAuthenticator{}}
-	}
-
-	return srv
 }
 
 // ListenAndServe is used to create a listener and serve on it
@@ -176,7 +190,12 @@ func (sf *Server) Shutdown() error {
 
 // ServeConn is used to serve a single connection.
 func (sf *Server) ServeConn(conn net.Conn) error {
-	defer conn.Close()
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			logger.Errorf("failed to close connection, %v", err)
+		}
+	}()
 
 	bufConn := bufio.NewReader(conn)
 
@@ -186,9 +205,9 @@ func (sf *Server) ServeConn(conn net.Conn) error {
 	}
 
 	switch b[0] {
-	case statute.VersionSocks5:
+	case VersionSocks5:
 		return sf.handleSocksRequest(conn, bufConn)
-	case statute.VersionSocks4:
+	case VersionSocks4:
 		return sf.handleSocks4Request(conn, bufConn)
 	default:
 		return sf.handleHTTPRequest(conn, bufConn)
@@ -223,19 +242,21 @@ func (sf *Server) handleHTTPRequest(conn net.Conn, bufConn *bufio.Reader) error 
 }
 
 func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error {
-	var authContext *AuthContext
-
-	mr, err := statute.ParseMethodRequest(bufConn)
+	mr, err := ParseMethodRequest(bufConn)
 	if err != nil {
 		return err
 	}
 
-	// Authenticate the connection
-	userAddr := ""
-	if conn.RemoteAddr() != nil {
-		userAddr = conn.RemoteAddr().String()
+	// Only support no auth
+	if !slices.Contains(mr.Methods, MethodNoAuth) {
+		// No usable method found
+		_, _ = conn.Write([]byte{VersionSocks5, MethodNoAcceptable})
+		return fmt.Errorf("unsupported auth methods: %v", mr.Methods)
 	}
-	authContext, err = sf.authenticate(conn, bufConn, userAddr, mr.Methods)
+
+	// say to client that no auth is required
+	_, err = conn.Write([]byte{VersionSocks5, MethodNoAuth})
+
 	if err != nil {
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
@@ -243,24 +264,23 @@ func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error
 	// The client request detail
 	request, err := ParseRequest(bufConn)
 	if err != nil {
-		if errors.Is(err, statute.ErrUnrecognizedAddrType) {
-			if err := SendReply(conn, statute.RepAddrTypeNotSupported, nil); err != nil {
+		if errors.Is(err, ErrUnrecognizedAddrType) {
+			if err := SendReply(conn, RepAddrTypeNotSupported, nil); err != nil {
 				return fmt.Errorf("failed to send reply %w", err)
 			}
 		}
 		return fmt.Errorf("failed to read destination address, %w", err)
 	}
 
-	if request.Request.Command != statute.CommandConnect &&
-		request.Request.Command != statute.CommandBind &&
-		request.Request.Command != statute.CommandAssociate {
-		if err := SendReply(conn, statute.RepCommandNotSupported, nil); err != nil {
+	if request.Request.Command != CommandConnect &&
+		request.Request.Command != CommandBind &&
+		request.Request.Command != CommandAssociate {
+		if err := SendReply(conn, RepCommandNotSupported, nil); err != nil {
 			return fmt.Errorf("failed to send reply, %v", err)
 		}
 		return fmt.Errorf("unrecognized command[%d]", request.Request.Command)
 	}
 
-	request.AuthContext = authContext
 	request.LocalAddr = conn.LocalAddr()
 	request.RemoteAddr = conn.RemoteAddr()
 	// Process the client request
@@ -307,10 +327,10 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 		}
 	}
 
-	atype := statute.ATYPIPv4
+	atype := ATYPIPv4
 
 	if dstHost != "" {
-		atype = statute.ATYPDomain
+		atype = ATYPDomain
 	}
 
 	if _, err := conn.Write([]byte{0, 90, 0, 0, 0, 0, 0, 0}); err != nil {
@@ -318,13 +338,12 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 	}
 
 	request := &Request{
-		Request:     statute.Request{},
-		AuthContext: nil,
-		LocalAddr:   conn.LocalAddr(),
-		RemoteAddr:  conn.RemoteAddr(),
-		DestAddr:    nil,
-		Reader:      bufConn,
-		RawDestAddr: &statute.AddrSpec{
+		Request:    Request{},
+		LocalAddr:  conn.LocalAddr(),
+		RemoteAddr: conn.RemoteAddr(),
+		DestAddr:   nil,
+		Reader:     bufConn,
+		RawDestAddr: &AddrSpec{
 			FQDN:     dstHost,
 			IP:       dstIP,
 			Port:     int(dstPort),
@@ -339,20 +358,41 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 	return errors.New("unsupported")
 }
 
-// authenticate is used to handle connection authentication
-func (sf *Server) authenticate(conn io.Writer, bufConn io.Reader,
-	userAddr string, methods []byte) (*AuthContext, error) {
-	// Select a usable method
-	for _, auth := range sf.authMethods {
-		for _, method := range methods {
-			if auth.GetCode() == method {
-				return auth.Authenticate(bufConn, conn, userAddr)
+// SendReply is used to send a reply message
+// rep: reply status see statute's statute file
+func SendReply(w io.Writer, rep uint8, bindAddr net.Addr) error {
+	rsp := Reply{
+		Version:  VersionSocks5,
+		Response: rep,
+		BndAddr: AddrSpec{
+			AddrType: ATYPIPv4,
+			IP:       net.IPv4zero,
+			Port:     0,
+		},
+	}
+
+	if bindAddr != nil {
+		if rsp.Response == RepSuccess {
+			if tcpAddr, ok := bindAddr.(*net.TCPAddr); ok && tcpAddr != nil {
+				rsp.BndAddr.IP = tcpAddr.IP
+				rsp.BndAddr.Port = tcpAddr.Port
+			} else if udpAddr, ok := bindAddr.(*net.UDPAddr); ok && udpAddr != nil {
+				rsp.BndAddr.IP = udpAddr.IP
+				rsp.BndAddr.Port = udpAddr.Port
+			} else {
+				rsp.Response = RepAddrTypeNotSupported
+			}
+
+			if rsp.BndAddr.IP.To4() != nil {
+				rsp.BndAddr.AddrType = ATYPIPv4
+			} else if rsp.BndAddr.IP.To16() != nil {
+				rsp.BndAddr.AddrType = ATYPIPv6
 			}
 		}
 	}
-	// No usable method found
-	conn.Write([]byte{statute.VersionSocks5, statute.MethodNoAcceptable}) //nolint: errcheck
-	return nil, statute.ErrNoSupportedAuth
+	// Send the message
+	_, err := w.Write(rsp.Bytes())
+	return err
 }
 
 func (sf *Server) goFunc(f func()) {

@@ -3,12 +3,11 @@ package transport
 
 import (
 	"bepass/config"
+	proxy "bepass/local/proxy"
 	"bepass/pkg/bufferpool"
 	"bepass/pkg/logger"
 	"bepass/pkg/net/adapters/ws"
 	"bepass/pkg/utils"
-	"bepass/socks5"
-	"bepass/socks5/statute"
 	"fmt"
 	"io"
 	"net"
@@ -22,7 +21,7 @@ type UDPBind struct {
 	TCPTunnel     *ws.Adapter
 	TunnelStatus  bool
 	SocksWriter   io.Writer
-	SocksReq      *socks5.Request
+	SocksReq      *proxy.Request
 	AssociateBind *net.UDPConn
 	RecvChan      chan UDPPacket
 }
@@ -40,10 +39,10 @@ type UDPPacket struct {
 }
 
 // TunnelTCP handles tcp network traffic.
-func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
+func (t *Transport) TunnelTCP(w io.Writer, req *proxy.Request) error {
 	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "tcp", config.Session.SessionID)
 	if err != nil {
-		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
+		if err := proxy.SendReply(w, proxy.RepServerFailure, nil); err != nil {
 			return err
 		}
 		logger.Infof("Could not split host and port: %v\n", err)
@@ -52,7 +51,7 @@ func (t *Transport) TunnelTCP(w io.Writer, req *socks5.Request) error {
 
 	wsConn, err := t.Tunnel.Dial(tunnelEndpoint)
 	if err != nil {
-		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
+		if err := proxy.SendReply(w, proxy.RepServerFailure, nil); err != nil {
 			return err
 		}
 		logger.Infof("Can not connect: %v\n", err)
@@ -95,25 +94,25 @@ func (t *Transport) Copy(reader io.Reader, writer io.Writer) error {
 }
 
 // TunnelUDP tunnels UDP packets over WebSocket.
-func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
+func (t *Transport) TunnelUDP(w io.Writer, req *proxy.Request) error {
 	udpAddr, _ := net.ResolveUDPAddr("udp", config.Udp.Bind+":0") // Use _ to indicate the error is intentionally ignored
 	// connect to remote server via ws
 	bindLn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
+		if err := proxy.SendReply(w, proxy.RepServerFailure, nil); err != nil {
 			return fmt.Errorf("failed to send reply, %v", err)
 		}
 		return fmt.Errorf("listen udp failed, %v", err)
 	}
 	logger.Infof("listening on %s udp for associate", bindLn.LocalAddr())
-	if err := socks5.SendReply(w, statute.RepSuccess, bindLn.LocalAddr()); err != nil {
+	if err := proxy.SendReply(w, proxy.RepSuccess, bindLn.LocalAddr()); err != nil {
 		logger.Errorf("failed to send reply: %v", err)
 		return err
 	}
 
 	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "udp", config.Session.SessionID)
 	if err != nil {
-		if err := socks5.SendReply(w, statute.RepServerFailure, nil); err != nil {
+		if err := proxy.SendReply(w, proxy.RepServerFailure, nil); err != nil {
 			return err
 		}
 		logger.Infof("Could not split host and port: %v\n", err)
@@ -149,7 +148,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 				}
 				break
 			}
-			pk, err := statute.ParseDatagram(bufPool[:n])
+			pk, err := proxy.ParseDatagram(bufPool[:n])
 			if err != nil {
 				continue
 			}
@@ -161,7 +160,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *socks5.Request) error {
 	}()
 	for {
 		datagram := <-udpBind.RecvChan
-		pkb, err := statute.NewDatagram(req.RawDestAddr.String(), datagram.Data)
+		pkb, err := proxy.NewDatagram(req.RawDestAddr.String(), datagram.Data)
 		if err != nil {
 			continue
 		}

@@ -1,9 +1,10 @@
-package server
+package local
 
 import (
 	"bepass/config"
+	proxy "bepass/local/proxy"
 	"bepass/pkg/bufferpool"
-	"bepass/socks5"
+	"bepass/proxy"
 	"bepass/transport"
 	"context"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 	"syscall"
 )
 
-var s5 *socks5.Server
+var s5 *proxy.Server
 
 func Run(captureCTRLC bool) error {
 	wsTunnel := &transport.WSTunnel{
@@ -40,23 +41,23 @@ func Run(captureCTRLC bool) error {
 	}
 
 	if config.Worker.Enable {
-		s5 = socks5.NewServer(
-			socks5.WithConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+		s5 = proxy.NewServer(
+			proxy.WithConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
 				return serverHandler.HandleTCPTunnel(ctx, w, req, true)
 			}),
-			socks5.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+			proxy.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
 				return serverHandler.HandleTCPTunnel(ctx, w, req, false)
 			}),
-			socks5.WithAssociateHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+			proxy.WithAssociateHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
 				return serverHandler.HandleUDPTunnel(ctx, w, req)
 			}),
 		)
 	} else {
-		s5 = socks5.NewServer(
-			socks5.WithConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+		s5 = proxy.NewServer(
+			proxy.WithConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
 				return serverHandler.HandleTCPFragment(ctx, w, req, true)
 			}),
-			socks5.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *socks5.Request) error {
+			proxy.WithSocks4ConnectHandle(func(ctx context.Context, w io.Writer, req *proxy.Request) error {
 				return serverHandler.HandleTCPFragment(ctx, w, req, false)
 			}),
 		)

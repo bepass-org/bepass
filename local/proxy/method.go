@@ -1,5 +1,5 @@
 // Package statute provides functionality for handling SOCKS5 protocol authentication.
-package statute
+package proxy
 
 import (
 	"io"
@@ -17,15 +17,6 @@ type MethodRequest struct {
 	Ver      byte
 	NMethods byte
 	Methods  []byte // 1-255 bytes
-}
-
-// NewMethodRequest new negotiation method request
-func NewMethodRequest(ver byte, medthods []byte) MethodRequest {
-	return MethodRequest{
-		ver,
-		byte(len(medthods)),
-		medthods,
-	}
 }
 
 // ParseMethodRequest parse method request.
@@ -53,27 +44,4 @@ func (sf MethodRequest) Bytes() []byte {
 	b = append(b, sf.Ver, sf.NMethods)
 	b = append(b, sf.Methods...)
 	return b
-}
-
-// MethodReply is the negotiation method reply packet
-// The SOCKS handshake method response is formed as follows:
-//
-//	+-----+--------+
-//	| VER | METHOD |
-//	+-----+--------+
-//	|  1  |     1  |
-//	+-----+--------+
-type MethodReply struct {
-	Ver    byte
-	Method byte
-}
-
-// ParseMethodReply parse method reply.
-func ParseMethodReply(r io.Reader) (n MethodReply, err error) {
-	bb := []byte{0, 0}
-	if _, err = io.ReadFull(r, bb); err != nil {
-		return
-	}
-	n.Ver, n.Method = bb[0], bb[1]
-	return
 }

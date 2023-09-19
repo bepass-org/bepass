@@ -1,5 +1,5 @@
 // Package statute provides functionality for handling SOCKS5 protocol authentication.
-package statute
+package proxy
 
 import (
 	"errors"
@@ -21,8 +21,6 @@ const (
 // method defined
 const (
 	MethodNoAuth       = byte(0x00)
-	MethodGSSAPI       = byte(0x01) // TODO: not support now
-	MethodUserPassAuth = byte(0x02)
 	MethodNoAcceptable = byte(0xff)
 )
 
@@ -47,18 +45,6 @@ const (
 	// 0x09 - 0xff unassigned
 )
 
-// auth defined
-const (
-	// user password version
-	UserPassAuthVersion = byte(0x01)
-	// auth status
-	AuthSuccess = byte(0x00)
-	AuthFailure = byte(0x01)
-)
-
-// error defined
 var (
 	ErrUnrecognizedAddrType = errors.New("unrecognized address type")
-	ErrNotSupportVersion    = errors.New("not support version")
-	ErrNotSupportMethod     = errors.New("not support method")
 )
