@@ -1,5 +1,6 @@
 # Bepass: A DPI-nightmare proxy
-
+<sub>
+          
 ```
 
           _____                    _____                    _____                    _____                    _____                    _____                  
@@ -26,4 +27,5 @@
                                                                                                                                                               
 
 ```
+</sub>
 > **Important Note:** this is a work in progress, and is not ready for use(YET).
