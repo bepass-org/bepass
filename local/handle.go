@@ -7,7 +7,6 @@ import (
 	"bepass/pkg/net/resolvers"
 	"bepass/pkg/proxy"
 	"bepass/pkg/sni"
-	"bepass/pkg/utils"
 	"bepass/transport"
 	"bytes"
 	"context"
@@ -81,7 +80,7 @@ func (s *Server) processFirstPacket(ctx context.Context, w io.Writer, req *proxy
 		IPPort = net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
 	}
 
-	req.Reader = &utils.BufferedReader{
+	req.Reader = &transport.BufferedReader{
 		FirstPacketData: firstPacketData,
 		BufReader:       req.Reader,
 		FirstTime:       true,

@@ -7,7 +7,6 @@ import (
 	"bepass/pkg/logger"
 	"bepass/pkg/net/adapters/ws"
 	proxy "bepass/pkg/proxy"
-	"bepass/pkg/utils"
 	"fmt"
 	"io"
 	"net"
@@ -40,7 +39,7 @@ type UDPPacket struct {
 
 // TunnelTCP handles tcp network traffic.
 func (t *Transport) TunnelTCP(w io.Writer, req *proxy.Request) error {
-	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "tcp", config.Session.SessionID)
+	tunnelEndpoint, err := WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "tcp", config.Session.SessionID)
 	if err != nil {
 		if err := proxy.SendReply(w, proxy.RepServerFailure, nil); err != nil {
 			return err
@@ -110,7 +109,7 @@ func (t *Transport) TunnelUDP(w io.Writer, req *proxy.Request) error {
 		return err
 	}
 
-	tunnelEndpoint, err := utils.WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "udp", config.Session.SessionID)
+	tunnelEndpoint, err := WSEndpointHelper(config.Worker.Sni, req.RawDestAddr.String(), "udp", config.Session.SessionID)
 	if err != nil {
 		if err := proxy.SendReply(w, proxy.RepServerFailure, nil); err != nil {
 			return err

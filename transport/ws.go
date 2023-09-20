@@ -31,12 +31,12 @@ type WSTunnel struct {
 func (w *WSTunnel) Dial(endpoint string) (*websocket.Conn, error) {
 	d := websocket.Dialer{
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer2.HttpDial(network, config.Worker.Host)
+			return dialer2.HttpDial(network, config.Worker.Connection.Hosts[0])
 		},
 
 		NetDialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer2.TLSDial(func(network, addr string) (net.Conn, error) {
-				return dialer2.FragmentDial(network, config.Worker.Host)
+				return dialer2.FragmentDial(network, config.Worker.Connection.Hosts[0])
 			}, network, addr)
 		},
 	}
