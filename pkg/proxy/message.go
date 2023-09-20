@@ -1,3 +1,4 @@
+// Package proxy provides functionality for handling SOCKS5, socks4/a and http/connect proxy protocol requests.
 package proxy
 
 import (
@@ -7,7 +8,7 @@ import (
 	"net"
 )
 
-// Socks5Request represents the SOCKS5 request, it contains everything that is not payload
+// SocksRequest represents the SOCKS5 request, it contains everything that is not payload
 // The SOCKS5 request is formed as follows:
 //
 // +-----+-----+-------+------+----------+----------+
@@ -15,7 +16,7 @@ import (
 // +-----+-----+-------+------+----------+----------+
 // |  1  |  1  | X'00' |  1   | Variable |    2     |
 // +-----+-----+-------+------+----------+----------+
-type Socks5Request struct {
+type SocksRequest struct {
 	// Version of socks5 protocol for message
 	Version byte
 	// Socks Command "connect","bind","associate"
@@ -27,7 +28,7 @@ type Socks5Request struct {
 }
 
 // ParseSocks5Request to request from io.Reader
-func ParseSocks5Request(r io.Reader) (req Socks5Request, err error) {
+func ParseSocks5Request(r io.Reader) (req SocksRequest, err error) {
 	// Read the version and command
 	tmp := []byte{0, 0}
 	if _, err = io.ReadFull(r, tmp); err != nil {
@@ -77,7 +78,7 @@ func ParseSocks5Request(r io.Reader) (req Socks5Request, err error) {
 }
 
 // Bytes returns a slice of request
-func (h Socks5Request) Bytes() (b []byte) {
+func (h SocksRequest) Bytes() (b []byte) {
 	var addr []byte
 
 	length := 6

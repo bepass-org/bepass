@@ -26,7 +26,7 @@ type GPool interface {
 // A Request represents a request received by a server, including authentication
 // details, addresses, and connection information.
 type Request struct {
-	Socks5Request
+	SocksRequest
 	// LocalAddr of the network server listener
 	LocalAddr net.Addr
 	// RemoteAddr of the network that sent the request
@@ -46,9 +46,9 @@ func ParseRequest(bufConn io.Reader) (*Request, error) {
 		return nil, err
 	}
 	return &Request{
-		Socks5Request: hd,
-		RawDestAddr:   &hd.DstAddr,
-		Reader:        bufConn,
+		SocksRequest: hd,
+		RawDestAddr:  &hd.DstAddr,
+		Reader:       bufConn,
 	}, nil
 }
 
@@ -204,7 +204,7 @@ func (sf *Server) ServeConn(conn net.Conn) error {
 
 	switch b[0] {
 	case VersionSocks5:
-		return sf.handleSocksRequest(conn, bufConn)
+		return sf.handleSocks5Request(conn, bufConn)
 	case VersionSocks4:
 		return sf.handleSocks4Request(conn, bufConn)
 	default:
@@ -239,7 +239,7 @@ func (sf *Server) handleHTTPRequest(conn net.Conn, bufConn *bufio.Reader) error 
 	return <-errChan
 }
 
-func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error {
+func (sf *Server) handleSocks5Request(conn net.Conn, bufConn *bufio.Reader) error {
 	mr, err := ParseMethodRequest(bufConn)
 	if err != nil {
 		return err
@@ -270,13 +270,13 @@ func (sf *Server) handleSocksRequest(conn net.Conn, bufConn *bufio.Reader) error
 		return fmt.Errorf("failed to read destination address, %w", err)
 	}
 
-	if request.Socks5Request.Command != CommandConnect &&
-		request.Socks5Request.Command != CommandBind &&
-		request.Socks5Request.Command != CommandAssociate {
+	if request.SocksRequest.Command != CommandConnect &&
+		request.SocksRequest.Command != CommandBind &&
+		request.SocksRequest.Command != CommandAssociate {
 		if err := SendReply(conn, RepCommandNotSupported, nil); err != nil {
 			return fmt.Errorf("failed to send reply, %v", err)
 		}
-		return fmt.Errorf("unrecognized command[%d]", request.Socks5Request.Command)
+		return fmt.Errorf("unrecognized command[%d]", request.SocksRequest.Command)
 	}
 
 	request.LocalAddr = conn.LocalAddr()
@@ -336,11 +336,11 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 	}
 
 	request := &Request{
-		Socks5Request: Socks5Request{},
-		LocalAddr:     conn.LocalAddr(),
-		RemoteAddr:    conn.RemoteAddr(),
-		DestAddr:      nil,
-		Reader:        bufConn,
+		SocksRequest: SocksRequest{},
+		LocalAddr:    conn.LocalAddr(),
+		RemoteAddr:   conn.RemoteAddr(),
+		DestAddr:     nil,
+		Reader:       bufConn,
 		RawDestAddr: &AddrSpec{
 			FQDN:     dstHost,
 			IP:       dstIP,
@@ -349,11 +349,7 @@ func (sf *Server) handleSocks4Request(conn net.Conn, bufConn *bufio.Reader) erro
 		},
 	}
 
-	if sf.Socks4ConnectHandle != nil {
-		return sf.Socks4ConnectHandle(context.Background(), io.Writer(conn), request)
-	}
-	logger.Errorf("socks4/a without user defined handler is unsupported")
-	return errors.New("unsupported")
+	return sf.Socks4ConnectHandle(context.Background(), io.Writer(conn), request)
 }
 
 // SendReply is used to send a reply message

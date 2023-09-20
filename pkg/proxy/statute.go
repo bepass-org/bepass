@@ -1,4 +1,4 @@
-// Package statute provides functionality for handling SOCKS5 protocol authentication.
+// Package proxy provides functionality for handling SOCKS5, socks4/a and http/connect proxy protocol requests.
 package proxy
 
 import (
