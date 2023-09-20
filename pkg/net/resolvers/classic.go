@@ -2,7 +2,6 @@ package resolvers
 
 import (
 	"bepass/pkg/logger"
-	"bepass/pkg/utils"
 	"crypto/tls"
 	"time"
 
@@ -64,7 +63,7 @@ func NewClassicResolver(server string, classicOpts ClassicResolverOpts, resolver
 func (r *ClassicResolver) Lookup(question dns.Question) (Response, error) {
 	var (
 		rsp      Response
-		messages = utils.PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
+		messages = PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
 	)
 	for _, msg := range messages {
 
@@ -114,7 +113,7 @@ func (r *ClassicResolver) Lookup(question dns.Question) (Response, error) {
 		rtt := time.Since(now)
 
 		// Get the authorities and answers.
-		output := utils.ParseMessage(in, rtt, r.server)
+		output := ParseMessage(in, rtt, r.server)
 		rsp.Authorities = output.Authorities
 		rsp.Answers = output.Answers
 

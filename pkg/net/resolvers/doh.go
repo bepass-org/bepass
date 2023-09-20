@@ -4,7 +4,6 @@ import (
 	"bepass/config"
 	"bepass/pkg/dialer"
 	"bepass/pkg/logger"
-	"bepass/pkg/utils"
 	"bytes"
 	"encoding/base64"
 	"fmt"
@@ -46,7 +45,7 @@ func NewDOHResolver(server string, resolverOpts Options) (Resolver, error) {
 func (r *DOHResolver) Lookup(question dns.Question) (Response, error) {
 	var (
 		rsp      Response
-		messages = utils.PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
+		messages = PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
 	)
 
 	for _, msg := range messages {
@@ -101,7 +100,7 @@ func (r *DOHResolver) Lookup(question dns.Question) (Response, error) {
 			rsp.Questions = append(rsp.Questions, ques)
 		}
 		// get the authorities and answers.
-		output := utils.ParseMessage(&msg, rtt, r.server)
+		output := ParseMessage(&msg, rtt, r.server)
 		rsp.Authorities = output.Authorities
 		rsp.Answers = output.Answers
 

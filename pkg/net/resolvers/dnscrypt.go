@@ -3,7 +3,6 @@ package resolvers
 import (
 	"bepass/pkg/dnscrypt"
 	"bepass/pkg/logger"
-	"bepass/pkg/utils"
 	"github.com/miekg/dns"
 	"time"
 )
@@ -46,7 +45,7 @@ func NewDNSCryptResolver(server string, dnscryptOpts DNSCryptResolverOpts, resol
 func (r *DNSCryptResolver) Lookup(question dns.Question) (Response, error) {
 	var (
 		rsp      Response
-		messages = utils.PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
+		messages = PrepareMessages(question, r.resolverOptions.Ndots, r.resolverOptions.SearchList)
 	)
 	for _, msg := range messages {
 		logger.Infof("attempting to resolve %s, ns: %s, ndots: %s",
@@ -70,7 +69,7 @@ func (r *DNSCryptResolver) Lookup(question dns.Question) (Response, error) {
 			rsp.Questions = append(rsp.Questions, ques)
 		}
 		// get the authorities and answers.
-		output := utils.ParseMessage(in, rtt, r.server)
+		output := ParseMessage(in, rtt, r.server)
 		rsp.Authorities = output.Authorities
 		rsp.Answers = output.Answers
 
