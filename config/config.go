@@ -2,47 +2,11 @@ package config
 
 import (
 	"bepass/pkg/logger"
-	"bepass/pkg/utils"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"time"
-)
-
-var (
-	availableFragmentModes = []string{
-		// weak|strong|aggressive|custom|advanced
-		"weak",
-		"strong",
-		"aggressive",
-		"custom",
-		"advanced",
-	}
-	availableTLSFingerPrints = []string{
-		// chrome|edge|firefox|safari|ios|android|auto
-		"chrome",
-		"edge",
-		"firefox",
-		"safari",
-		"ios",
-		"android",
-		"auto",
-	}
-	availableDNSStrategies = []string{
-		// direct|proxy
-		"direct",
-		"proxy",
-	}
-	availableDNSTypes = []string{
-		// udp|tcp|dot|doh|crypt|system
-		"udp",
-		"tcp",
-		"dot",
-		"doh",
-		"crypt",
-		"system",
-	}
 )
 
 type server struct {
@@ -97,10 +61,14 @@ type dns struct {
 }
 
 type worker struct {
-	Enable  bool   `json:"enable"`
-	Sni     string `json:"sni"`
-	Host    string `json:"host"`
-	Scanner bool   `json:"scanner"`
+	Enable     bool   `json:"enable"`
+	Sni        string `json:"sni"`
+	Connection struct {
+		Type    string   `json:"type"`
+		Ports   []int    `json:"ports"`
+		Hosts   []string `json:"hosts"`
+		Timeout int64    `json:"timeout"`
+	} `json:"connection"`
 }
 
 type udp struct {
@@ -154,7 +122,7 @@ func FromJSON(jsonStr []byte) {
 	}
 	Session = session{
 		SessionID: fmt.Sprintf("%d", rand.Intn(8999)+1000),
-		ClientID:  utils.ShortID(6),
+		ClientID:  shortID(6),
 	}
 }
 

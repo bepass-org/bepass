@@ -21,7 +21,7 @@
       10,
       30
     ],
-    "mode": "weak|strong|aggressive|advanced",
+    "mode": "weak|strong|aggressive|adaptive|advanced",
     "advanced": {
       "bsl": [
         2000,
@@ -40,10 +40,10 @@
   "dns": {
     "strategy": "direct|proxy",
     "prefer": "ipv4|ipv6|auto",
-    "type": "doh|dot|sdns",
+    "type": "udp|tcp|dot|doh|crypt|system",
     "address": "https://dns.rotunneling.net/dns-query/public",
     "ttl": 300,
-    "timeout": "10",
+    "timeout": 10,
     "fragment": false,
     "hosts": [
       {
@@ -55,8 +55,24 @@
   "worker": {
     "enable": true,
     "sni": "worker_name.user.workers.dev",
-    "host": "<ip>:<port>",
-    "scanner": false
+    "connection": {
+      "type": "scanner|random",
+      "useIPv6": false,
+      "ports": [
+        80,
+        443,
+        8443,
+        2096,
+        2053,
+        2083,
+        2087
+      ],
+      "hosts": [
+        "172.64.0.0/13",
+        "198.41.128.0/17"
+      ],
+      "timeout": 120
+    }
   },
   "udp": {
     "enable": true,
