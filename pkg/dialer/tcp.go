@@ -3,9 +3,9 @@
 package dialer
 
 import (
-	"bepass/config"
-	"bepass/pkg/logger"
-	"bepass/pkg/protect"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/pkg/protect"
 	"net"
 	"runtime"
 	"strconv"

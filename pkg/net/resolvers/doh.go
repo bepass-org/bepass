@@ -1,12 +1,12 @@
 package resolvers
 
 import (
-	"bepass/config"
-	"bepass/pkg/dialer"
-	"bepass/pkg/logger"
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/dialer"
+	"github.com/uoosef/bepass/pkg/logger"
 	"io"
 	"net/http"
 	"net/url"

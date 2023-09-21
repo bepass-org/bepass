@@ -1,9 +1,9 @@
 package resolvers
 
 import (
-	"bepass/config"
-	"bepass/pkg/cache"
-	"bepass/pkg/logger"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/cache"
+	"github.com/uoosef/bepass/pkg/logger"
 	"strings"
 	"time"
 

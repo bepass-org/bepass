@@ -1,9 +1,9 @@
 package resolvers
 
 import (
-	"bepass/pkg/dnscrypt"
-	"bepass/pkg/logger"
 	"github.com/miekg/dns"
+	"github.com/uoosef/bepass/pkg/dnscrypt"
+	"github.com/uoosef/bepass/pkg/logger"
 	"time"
 )
 

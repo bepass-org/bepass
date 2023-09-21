@@ -1,8 +1,8 @@
 package resolvers
 
 import (
-	"bepass/pkg/logger"
 	"crypto/tls"
+	"github.com/uoosef/bepass/pkg/logger"
 	"time"
 
 	"github.com/miekg/dns"

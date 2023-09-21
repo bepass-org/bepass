@@ -1,9 +1,9 @@
 package resolvers
 
 import (
-	"bepass/config"
 	"fmt"
 	"github.com/miekg/dns"
+	"github.com/uoosef/bepass/config"
 	"net"
 )
 

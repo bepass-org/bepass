@@ -1,9 +1,9 @@
 package config
 
 import (
-	"bepass/pkg/logger"
 	"encoding/json"
 	"fmt"
+	"github.com/uoosef/bepass/pkg/logger"
 	"math/rand"
 	"os"
 	"time"
@@ -124,6 +124,7 @@ func FromJSON(jsonStr []byte) {
 		SessionID: fmt.Sprintf("%d", rand.Intn(8999)+1000),
 		ClientID:  shortID(6),
 	}
+	validateConfig()
 }
 
 func FromFile(path string) {

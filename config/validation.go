@@ -1,8 +1,8 @@
 package config
 
 import (
-	"bepass/pkg/logger"
 	"fmt"
+	"github.com/uoosef/bepass/pkg/logger"
 	"net"
 	"time"
 )
@@ -57,7 +57,7 @@ var (
 func validateConfig() {
 	// Check if the provided address is available
 	if isPortAvailable(Server.Bind) {
-		logger.Info("%s is free and available", Server.Bind)
+		logger.Infof("%s is free and available", Server.Bind)
 	} else {
 		// If not available, find an available port and bind to 0.0.0.0
 		port, err := findAvailablePort()

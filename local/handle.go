@@ -1,16 +1,16 @@
 package local
 
 import (
-	"bepass/pkg/bufferpool"
-	"bepass/pkg/dialer"
-	"bepass/pkg/logger"
-	"bepass/pkg/net/resolvers"
-	"bepass/pkg/proxy"
-	"bepass/pkg/sni"
-	"bepass/transport"
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/uoosef/bepass/pkg/bufferpool"
+	"github.com/uoosef/bepass/pkg/dialer"
+	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/pkg/net/resolvers"
+	"github.com/uoosef/bepass/pkg/proxy"
+	"github.com/uoosef/bepass/pkg/sni"
+	"github.com/uoosef/bepass/transport"
 	"io"
 	"net"
 	"strconv"

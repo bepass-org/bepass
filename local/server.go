@@ -1,12 +1,12 @@
 package local
 
 import (
-	"bepass/config"
-	"bepass/pkg/bufferpool"
-	"bepass/pkg/proxy"
-	"bepass/transport"
 	"context"
 	"fmt"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/bufferpool"
+	"github.com/uoosef/bepass/pkg/proxy"
+	"github.com/uoosef/bepass/transport"
 	"io"
 	"os"
 	"os/signal"

@@ -2,8 +2,6 @@
 package proxy
 
 import (
-	"bepass/pkg/bufferpool"
-	"bepass/pkg/logger"
 	"bufio"
 	"bytes"
 	"context"
@@ -11,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elazarl/goproxy"
+	"github.com/uoosef/bepass/pkg/bufferpool"
+	"github.com/uoosef/bepass/pkg/logger"
 	"golang.org/x/net/proxy"
 	"io"
 	"net"

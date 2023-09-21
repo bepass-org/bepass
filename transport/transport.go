@@ -2,12 +2,12 @@
 package transport
 
 import (
-	"bepass/config"
-	"bepass/pkg/bufferpool"
-	"bepass/pkg/logger"
-	"bepass/pkg/net/adapters/ws"
-	proxy "bepass/pkg/proxy"
 	"fmt"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/bufferpool"
+	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/pkg/net/adapters/ws"
+	proxy "github.com/uoosef/bepass/pkg/proxy"
 	"io"
 	"net"
 	"strings"

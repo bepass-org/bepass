@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"bepass/config"
+	"github.com/uoosef/bepass/config"
 	"time"
 )
 

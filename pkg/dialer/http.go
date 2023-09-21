@@ -3,10 +3,10 @@
 package dialer
 
 import (
-	"bepass/config"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/uoosef/bepass/config"
 	"net"
 	"net/http"
 	"net/url"

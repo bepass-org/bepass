@@ -1,4 +1,4 @@
-module bepass
+module github.com/uoosef/bepass
 
 go 1.21
 

@@ -1,9 +1,9 @@
 package fragment
 
 import (
-	"bepass/config"
-	"bepass/pkg/sni"
 	"bytes"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/sni"
 	"math/rand"
 	"net"
 	"strings"

@@ -2,12 +2,12 @@
 package transport
 
 import (
-	"bepass/config"
-	dialer2 "bepass/pkg/dialer"
-	"bepass/pkg/logger"
-	"bepass/pkg/net/adapters/ws"
 	"context"
 	"encoding/binary"
+	"github.com/uoosef/bepass/config"
+	dialer2 "github.com/uoosef/bepass/pkg/dialer"
+	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/pkg/net/adapters/ws"
 	"net"
 	"strings"
 	"time"

@@ -3,10 +3,10 @@
 package dialer
 
 import (
-	"bepass/config"
-	"bepass/pkg/logger"
 	"fmt"
 	tls "github.com/refraction-networking/utls"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/pkg/logger"
 	"io"
 	"math/rand"
 	"net"

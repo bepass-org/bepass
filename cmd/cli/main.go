@@ -2,12 +2,12 @@
 package main
 
 import (
-	"bepass/config"
-	"bepass/local"
-	"bepass/pkg/logger"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/local"
+	"github.com/uoosef/bepass/pkg/logger"
 	"os"
 )
 
