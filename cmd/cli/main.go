@@ -6,8 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/internal/logger"
 	"github.com/uoosef/bepass/local"
-	"github.com/uoosef/bepass/pkg/logger"
 	"os"
 )
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/uoosef/bepass/config"
-	"github.com/uoosef/bepass/pkg/bufferpool"
-	"github.com/uoosef/bepass/pkg/proxy"
-	"github.com/uoosef/bepass/transport"
+	"github.com/uoosef/bepass/internal/bufferpool"
+	"github.com/uoosef/bepass/internal/proxy"
+	transport2 "github.com/uoosef/bepass/internal/transport"
 	"io"
 	"os"
 	"os/signal"
@@ -16,11 +16,11 @@ import (
 var s5 *proxy.Server
 
 func Run(captureCTRLC bool) error {
-	wsTunnel := &transport.WSTunnel{
-		EstablishedTunnels: make(map[string]*transport.EstablishedTunnel),
+	wsTunnel := &transport2.WSTunnel{
+		EstablishedTunnels: make(map[string]*transport2.EstablishedTunnel),
 	}
 
-	tunnelTransport := &transport.Transport{
+	tunnelTransport := &transport2.Transport{
 		BufferPool: bufferpool.NewPool(32 * 1024),
 		Tunnel:     wsTunnel,
 	}

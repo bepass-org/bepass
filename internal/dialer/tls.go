@@ -6,7 +6,7 @@ import (
 	"fmt"
 	tls "github.com/refraction-networking/utls"
 	"github.com/uoosef/bepass/config"
-	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/internal/logger"
 	"io"
 	"math/rand"
 	"net"

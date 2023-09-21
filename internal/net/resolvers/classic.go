@@ -2,7 +2,7 @@ package resolvers
 
 import (
 	"crypto/tls"
-	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/internal/logger"
 	"time"
 
 	"github.com/miekg/dns"

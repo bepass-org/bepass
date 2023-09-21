@@ -2,8 +2,8 @@ package http
 
 import (
 	"bytes"
-	"github.com/uoosef/bepass/pkg/logger"
-	"github.com/uoosef/bepass/pkg/sni"
+	"github.com/uoosef/bepass/internal/logger"
+	"github.com/uoosef/bepass/internal/sni"
 	"net"
 	"sync"
 	"time"

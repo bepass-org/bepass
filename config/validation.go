@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/internal/logger"
 	"net"
 	"time"
 )

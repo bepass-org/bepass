@@ -2,8 +2,8 @@ package resolvers
 
 import (
 	"github.com/miekg/dns"
-	"github.com/uoosef/bepass/pkg/dnscrypt"
-	"github.com/uoosef/bepass/pkg/logger"
+	"github.com/uoosef/bepass/internal/dnscrypt"
+	"github.com/uoosef/bepass/internal/logger"
 	"time"
 )
 
