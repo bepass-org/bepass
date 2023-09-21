@@ -10,7 +10,7 @@ import (
 	"github.com/uoosef/bepass/internal/net/resolvers"
 	"github.com/uoosef/bepass/internal/proxy"
 	"github.com/uoosef/bepass/internal/sni"
-	transport2 "github.com/uoosef/bepass/internal/transport"
+	"github.com/uoosef/bepass/internal/transport"
 	"io"
 	"net"
 	"strconv"
@@ -19,7 +19,7 @@ import (
 )
 
 type Server struct {
-	Transport *transport2.Transport
+	Transport *transport.Transport
 }
 
 // extractHostnameOrChangeHTTPHostHeader This function extracts the tls sni or http
@@ -80,7 +80,7 @@ func (s *Server) processFirstPacket(ctx context.Context, w io.Writer, req *proxy
 		IPPort = net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port))
 	}
 
-	req.Reader = &transport2.BufferedReader{
+	req.Reader = &transport.BufferedReader{
 		FirstPacketData: firstPacketData,
 		BufReader:       req.Reader,
 		FirstTime:       true,
