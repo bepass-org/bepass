@@ -65,6 +65,7 @@ type worker struct {
 	Sni        string `json:"sni"`
 	Connection struct {
 		Type    string   `json:"type"`
+		UseIPv6 bool     `json:"useIPv6"`
 		Ports   []int    `json:"ports"`
 		Hosts   []string `json:"hosts"`
 		Refresh int64    `json:"refresh"`

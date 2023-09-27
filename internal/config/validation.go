@@ -3,7 +3,9 @@ package config
 import (
 	"fmt"
 	"github.com/uoosef/bepass/internal/logger"
+	"github.com/uoosef/bepass/internal/worker/cf"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -127,6 +129,8 @@ func validateConfig() {
 		Worker.Connection.Type = "scanner"
 		logger.Warn("invalid worker connection type, set to default worker connection type: `scanner`")
 	}
+
+	checkWorkerConnectionHosts()
 }
 
 func findAvailablePort() (string, error) {
@@ -217,4 +221,56 @@ func checkWorkerConnectionType(connectionType string) bool {
 		}
 	}
 	return false
+}
+
+// check worker connection hosts format
+func checkWorkerConnectionHosts() {
+	if !Worker.Enable {
+		return
+	}
+	if len(Worker.Connection.Hosts) == 0 {
+		Worker.Connection.Hosts = cf.CFIP4Ranges
+		if Worker.Connection.UseIPv6 {
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, cf.CFIP6Ranges...)
+		}
+	}
+	counter := 0
+	tmpHosts := make([]string, 0)
+	for _, ip := range Worker.Connection.Hosts {
+		if !isValidIPAddress(ip) && !isValidCIDR(ip) {
+			logger.Errorf("invalid worker connection ip or cidr: %s, skipping...", ip)
+			continue
+		}
+		if !strings.Contains(ip, "/") && isValidIPAddress(ip) {
+			tmpHosts = append(tmpHosts, ipToCIDR(ip))
+		}
+		tmpHosts = append(tmpHosts, ip)
+		counter++
+	}
+	Worker.Connection.Hosts = tmpHosts
+	if counter == 0 {
+		logger.Errorf("wtf? every single worker connection ip or cidr is invalid!, using default cloudflare ip ranges...")
+		Worker.Connection.Hosts = cf.CFIP4Ranges
+		if Worker.Connection.UseIPv6 {
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, cf.CFIP6Ranges...)
+		}
+	}
+}
+
+func isValidIPAddress(input string) bool {
+	ip := net.ParseIP(input)
+	return ip != nil
+}
+
+func isValidCIDR(input string) bool {
+	_, _, err := net.ParseCIDR(input)
+	return err == nil
+}
+
+func ipToCIDR(ipString string) string {
+	ip := net.ParseIP(ipString)
+	if ip.To4() != nil {
+		return fmt.Sprintf("%s/32", ip.String()) // IPv4, /32 indicates a single host
+	}
+	return fmt.Sprintf("%s/128", ip.String()) // IPv6, /128 indicates a single host
 }
