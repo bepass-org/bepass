@@ -67,6 +67,7 @@ type worker struct {
 		Type    string   `json:"type"`
 		Ports   []int    `json:"ports"`
 		Hosts   []string `json:"hosts"`
+		Refresh int64    `json:"refresh"`
 		Timeout int64    `json:"timeout"`
 	} `json:"connection"`
 }

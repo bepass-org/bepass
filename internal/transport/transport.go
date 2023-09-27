@@ -3,8 +3,8 @@ package transport
 
 import (
 	"fmt"
-	"github.com/uoosef/bepass/config"
 	"github.com/uoosef/bepass/internal/bufferpool"
+	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/logger"
 	"github.com/uoosef/bepass/internal/net/adapters/ws"
 	proxy "github.com/uoosef/bepass/internal/proxy"

@@ -5,7 +5,7 @@ package dialer
 import (
 	"fmt"
 	tls "github.com/refraction-networking/utls"
-	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/logger"
 	"io"
 	"math/rand"

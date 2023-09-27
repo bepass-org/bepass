@@ -2,7 +2,7 @@ package fragment
 
 import (
 	"bytes"
-	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/sni"
 	"math/rand"
 	"net"

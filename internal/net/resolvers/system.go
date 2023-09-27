@@ -3,7 +3,7 @@ package resolvers
 import (
 	"fmt"
 	"github.com/miekg/dns"
-	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/internal/config"
 	"net"
 )
 

@@ -3,8 +3,8 @@ package local
 import (
 	"context"
 	"fmt"
-	"github.com/uoosef/bepass/config"
 	"github.com/uoosef/bepass/internal/bufferpool"
+	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/proxy"
 	"io"
 	"os"

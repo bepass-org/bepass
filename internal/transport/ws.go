@@ -4,7 +4,7 @@ package transport
 import (
 	"context"
 	"encoding/binary"
-	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/internal/config"
 	dialer2 "github.com/uoosef/bepass/internal/dialer"
 	"github.com/uoosef/bepass/internal/logger"
 	"github.com/uoosef/bepass/internal/net/adapters/ws"

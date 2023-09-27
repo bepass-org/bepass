@@ -56,10 +56,9 @@
     "enable": true,
     "sni": "worker_name.user.workers.dev",
     "connection": {
-      "type": "scanner|random",
+      "type": "scanner|shuffle",
       "useIPv6": false,
       "ports": [
-        80,
         443,
         8443,
         2096,
@@ -71,6 +70,7 @@
         "172.64.0.0/13",
         "198.41.128.0/17"
       ],
+      "refresh": 120,
       "timeout": 120
     }
   },

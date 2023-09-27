@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/uoosef/bepass/config"
+	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/logger"
 	"github.com/uoosef/bepass/local"
 	"os"
