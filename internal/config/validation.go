@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/uoosef/bepass/internal/logger"
-	"github.com/uoosef/bepass/internal/worker/cf"
+	"github.com/uoosef/bepass/internal/worker/scanner"
 	"net"
 	"strings"
 	"time"
@@ -229,9 +229,9 @@ func checkWorkerConnectionHosts() {
 		return
 	}
 	if len(Worker.Connection.Hosts) == 0 {
-		Worker.Connection.Hosts = cf.CFIP4Ranges
+		Worker.Connection.Hosts = scanner.CFIP4Ranges
 		if Worker.Connection.UseIPv6 {
-			Worker.Connection.Hosts = append(Worker.Connection.Hosts, cf.CFIP6Ranges...)
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, scanner.CFIP6Ranges...)
 		}
 	}
 	counter := 0
@@ -250,9 +250,9 @@ func checkWorkerConnectionHosts() {
 	Worker.Connection.Hosts = tmpHosts
 	if counter == 0 {
 		logger.Errorf("wtf? every single worker connection ip or cidr is invalid!, using default cloudflare ip ranges...")
-		Worker.Connection.Hosts = cf.CFIP4Ranges
+		Worker.Connection.Hosts = scanner.CFIP4Ranges
 		if Worker.Connection.UseIPv6 {
-			Worker.Connection.Hosts = append(Worker.Connection.Hosts, cf.CFIP6Ranges...)
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, scanner.CFIP6Ranges...)
 		}
 	}
 }

@@ -1,6 +1,6 @@
-package cf
+package scanner
 
-var ip4Ranges = []string{
+var CFIP4Ranges = []string{
 	"103.21.244.0/22",
 	"103.22.200.0/22",
 	"103.31.4.0/22",
@@ -17,7 +17,7 @@ var ip4Ranges = []string{
 	"198.41.128.0/17",
 }
 
-var ip6Ranges = []string{
+var CFIP6Ranges = []string{
 	"2400:cb00::/32",
 	"2405:8100::/32",
 	"2405:b500::/32",

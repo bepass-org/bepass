@@ -1,23 +1,24 @@
-package cf
+package scanner
 
 import (
 	"context"
 	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/logger"
 	"github.com/uoosef/bepass/internal/ping"
+	"github.com/uoosef/bepass/internal/worker/tools/ipIterator"
 	"net"
 	"time"
 )
 
 type Scanner struct {
 	usableIPs *IPQueue
-	generator *ipGenerator
+	generator *ipIterator.IpGenerator
 }
 
 func NewScanner() *Scanner {
 	return &Scanner{
 		usableIPs: newIPQueue(),
-		generator: newIPGenerator(config.Worker.Connection.Hosts),
+		generator: ipIterator.NewIterator(config.Worker.Connection.Hosts),
 	}
 }
 

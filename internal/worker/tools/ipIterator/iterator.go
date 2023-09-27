@@ -1,15 +1,16 @@
-package cf
+package ipIterator
 
 import (
-	"github.com/uoosef/bepass/internal/cf/jblack"
-	"github.com/uoosef/bepass/internal/logger"
+	"fmt"
+	"github.com/uoosef/bepass/internal/worker/tools/jblack"
 	"math/big"
-	"math/rand"
 	"net"
 	"time"
 )
 
 type ipRange struct {
+	ipNet *net.IPNet
+	br    *jblack.Blackrock
 	start net.IP
 	stop  net.IP
 	size  uint64
@@ -21,7 +22,14 @@ func newIPRange(cidr string) (ipRange, error) {
 	if err != nil {
 		return ipRange{}, err
 	}
-	return ipRange{start: ipNet.IP, stop: lastIP(ipNet), size: ipRangeSize(ipNet), index: 0}, nil
+	return ipRange{
+		ipNet: ipNet,
+		start: ipNet.IP,
+		stop:  lastIP(ipNet),
+		size:  ipRangeSize(ipNet),
+		index: 0,
+		br:    jblack.NewBlackrock(ipRangeSize(ipNet), jblack.DefaultRounds, time.Now().UnixNano()),
+	}, nil
 }
 
 func lastIP(ipNet *net.IPNet) net.IP {
@@ -53,38 +61,52 @@ func ipRangeSize(ipNet *net.IPNet) uint64 {
 	return 1 << uint(bits-ones)
 }
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-type ipGenerator struct {
+type IpGenerator struct {
 	ipRanges []ipRange
 }
 
-func (g *ipGenerator) NextBatch() ([]net.IP, error) {
+func (g *IpGenerator) NextBatch() ([]net.IP, error) {
 	var results []net.IP
-	for i, ipRange := range g.ipRanges {
-		br := jblack.NewBlackrock(ipRange.size, jblack.DefaultRounds, time.Now().UnixNano())
-		results = append(results, addIP(ipRange.start, br.Shuffle(ipRange.index)))
+	for i, r := range g.ipRanges {
+		if r.index >= r.size {
+			continue
+		}
+		results = append(results, addIP(r.start, r.br.Shuffle(r.index)))
 		g.ipRanges[i].index++
-		g.ipRanges[i].index %= ipRange.size
-
+	}
+	if len(results) == 0 {
+		okFlag := false
+		for i := range g.ipRanges {
+			if g.ipRanges[i].index > 0 {
+				okFlag = true
+			}
+			g.ipRanges[i].index = 0
+		}
+		if okFlag {
+			// reshuffle and start over
+			for i := range g.ipRanges {
+				g.ipRanges[i].br = jblack.NewBlackrock(ipRangeSize(g.ipRanges[i].ipNet), jblack.DefaultRounds, time.Now().UnixNano())
+			}
+			return g.NextBatch()
+		} else {
+			return nil, fmt.Errorf("no more IP addresses")
+		}
 	}
 	return results, nil
 }
 
-func newIPGenerator(cidrs []string) *ipGenerator {
+func NewIterator(cidrs []string) *IpGenerator {
 	var ranges []ipRange
 	for _, cidr := range cidrs {
 		ipRange, err := newIPRange(cidr)
 		if err != nil {
-			logger.Errorf("Error parsing CIDR %s: %v\n", cidr, err)
+			fmt.Printf("Error parsing CIDR %s: %v\n", cidr, err)
 			continue
 		}
 		ranges = append(ranges, ipRange)
 	}
 
-	return &ipGenerator{
+	return &IpGenerator{
 		ipRanges: ranges,
 	}
 }

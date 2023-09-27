@@ -1,4 +1,4 @@
-package cf
+package scanner
 
 type IpRTT struct {
 	ip  string
