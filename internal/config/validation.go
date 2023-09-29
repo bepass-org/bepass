@@ -130,7 +130,14 @@ func validateConfig() {
 		logger.Warn("invalid worker connection type, set to default worker connection type: `scanner`")
 	}
 
+	// validate worker connection hosts(cidr or ips that users specified in config)
 	checkWorkerConnectionHosts()
+
+	// check what user specified in IPQueueCapacity config is valid
+	setWorkerIPQueueCapacity()
+
+	// check what user specified in Worker.Connection.Refresh config is valid
+	checkWorkerIPQueueRefreshInterval()
 }
 
 func findAvailablePort() (string, error) {
@@ -273,4 +280,49 @@ func ipToCIDR(ipString string) string {
 		return fmt.Sprintf("%s/32", ip.String()) // IPv4, /32 indicates a single host
 	}
 	return fmt.Sprintf("%s/128", ip.String()) // IPv6, /128 indicates a single host
+}
+
+// calculate the possible size of the worker ip queue capacity
+func setWorkerIPQueueCapacity() {
+	if !Worker.Enable {
+		return
+	}
+	totalIPs := 0
+	for _, cidr := range Worker.Connection.Hosts {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			logger.Errorf("Error parsing CIDR %s: %s\n", cidr, err)
+			continue
+		}
+
+		ones, bits := ipNet.Mask.Size()
+		totalIPs += 1 << uint(bits-ones)
+	}
+	// subtract the reserved ips(broadcast and network address)
+	totalIPs -= 2 * len(Worker.Connection.Hosts)
+	// check if total ips is less than 1 then use default cloudflare cidr
+	if totalIPs < 1 {
+		Worker.Connection.Hosts = scanner.CFIP4Ranges
+		if Worker.Connection.UseIPv6 {
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, scanner.CFIP6Ranges...)
+		}
+		Worker.Connection.QueueCapacity = 10
+		return
+	}
+	// check if user specified ip queue capacity is valid
+	if Worker.Connection.QueueCapacity > 0 && Worker.Connection.QueueCapacity <= totalIPs {
+		return
+	}
+	Worker.Connection.QueueCapacity = totalIPs
+}
+
+// check worker ip queue refresh interval is valid
+func checkWorkerIPQueueRefreshInterval() {
+	if !Worker.Enable {
+		return
+	}
+	// minimum refresh interval is 5 minutes
+	if Worker.Connection.Refresh <= 5*60 {
+		Worker.Connection.Refresh = 5 * 60
+	}
 }

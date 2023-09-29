@@ -9,3 +9,17 @@
 // shuffler: user will provide a list of hosts in config. the shuffler will shuffle the list
 // and return's a random host:port combination shuffler will accept ips and cidrs.
 package host
+
+import "github.com/uoosef/bepass/internal/worker/scanner"
+
+type Generator struct {
+	scanner *scanner.Scanner
+}
+
+func NewGenerator() *Generator {
+	return &Generator{}
+}
+
+func (g *Generator) Generate() string {
+	return ""
+}
