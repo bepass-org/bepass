@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"github.com/uoosef/bepass/internal/logger"
-	"github.com/uoosef/bepass/internal/worker/scanner"
 	"net"
 	"strings"
 	"time"
@@ -54,9 +53,9 @@ var (
 	}
 )
 
-// validateConfig validates the config that user provided it checks if user inputs are actually making any sense
+// ValidateConfig validates the config that user provided it checks if user inputs are actually making any sense
 // and if some parts of config doesn't exist it will fill it with default values
-func validateConfig() {
+func ValidateConfig() {
 	// Check if the provided address is available
 	if isPortAvailable(Server.Bind) {
 		logger.Infof("%s is free and available", Server.Bind)
@@ -236,9 +235,9 @@ func checkWorkerConnectionHosts() {
 		return
 	}
 	if len(Worker.Connection.Hosts) == 0 {
-		Worker.Connection.Hosts = scanner.CFIP4Ranges
+		Worker.Connection.Hosts = CFIP4Ranges
 		if Worker.Connection.UseIPv6 {
-			Worker.Connection.Hosts = append(Worker.Connection.Hosts, scanner.CFIP6Ranges...)
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, CFIP6Ranges...)
 		}
 	}
 	counter := 0
@@ -257,9 +256,9 @@ func checkWorkerConnectionHosts() {
 	Worker.Connection.Hosts = tmpHosts
 	if counter == 0 {
 		logger.Errorf("wtf? every single worker connection ip or cidr is invalid!, using default cloudflare ip ranges...")
-		Worker.Connection.Hosts = scanner.CFIP4Ranges
+		Worker.Connection.Hosts = CFIP4Ranges
 		if Worker.Connection.UseIPv6 {
-			Worker.Connection.Hosts = append(Worker.Connection.Hosts, scanner.CFIP6Ranges...)
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, CFIP6Ranges...)
 		}
 	}
 }
@@ -302,9 +301,9 @@ func setWorkerIPQueueCapacity() {
 	totalIPs -= 2 * len(Worker.Connection.Hosts)
 	// check if total ips is less than 1 then use default cloudflare cidr
 	if totalIPs < 1 {
-		Worker.Connection.Hosts = scanner.CFIP4Ranges
+		Worker.Connection.Hosts = CFIP4Ranges
 		if Worker.Connection.UseIPv6 {
-			Worker.Connection.Hosts = append(Worker.Connection.Hosts, scanner.CFIP6Ranges...)
+			Worker.Connection.Hosts = append(Worker.Connection.Hosts, CFIP6Ranges...)
 		}
 		Worker.Connection.QueueCapacity = 10
 		return

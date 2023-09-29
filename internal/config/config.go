@@ -125,9 +125,9 @@ func FromJSON(jsonStr []byte) {
 	}
 	Session = session{
 		SessionID: fmt.Sprintf("%d", rand.Intn(8999)+1000),
-		ClientID:  shortID(6),
+		ClientID:  ShortID(6),
 	}
-	validateConfig()
+	ValidateConfig()
 }
 
 func FromFile(path string) {

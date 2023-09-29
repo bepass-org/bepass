@@ -6,6 +6,7 @@ import (
 	"github.com/uoosef/bepass/internal/bufferpool"
 	"github.com/uoosef/bepass/internal/config"
 	"github.com/uoosef/bepass/internal/proxy"
+	"github.com/uoosef/bepass/internal/transport"
 	"io"
 	"os"
 	"os/signal"

@@ -1,4 +1,4 @@
-package scanner
+package config
 
 var CFIP4Ranges = []string{
 	"103.21.244.0/22",
