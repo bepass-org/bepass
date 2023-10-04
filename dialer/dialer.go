@@ -2,8 +2,8 @@
 package dialer
 
 import (
-	"bepass/net/adapter/fragment"
-	"bepass/net/adapter/http"
+	"github.com/bepass-org/bepass/net/adapter/fragment"
+	"github.com/bepass-org/bepass/net/adapter/http"
 	"net"
 )
 

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bepass/config"
-	"bepass/server"
 	"encoding/json"
 	"fmt"
+	"github.com/bepass-org/bepass/config"
+	"github.com/bepass-org/bepass/server"
 	"io"
 
 	"fyne.io/fyne/v2"

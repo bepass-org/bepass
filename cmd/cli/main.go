@@ -2,12 +2,12 @@
 package main
 
 import (
-	"bepass/config"
-	"bepass/logger"
-	"bepass/server"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bepass-org/bepass/config"
+	"github.com/bepass-org/bepass/logger"
+	"github.com/bepass-org/bepass/server"
 	"os"
 	"os/signal"
 	"strings"

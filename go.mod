@@ -1,4 +1,4 @@
-module bepass
+module github.com/bepass-org/bepass
 
 go 1.19
 

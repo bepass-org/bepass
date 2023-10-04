@@ -4,15 +4,15 @@
 package socks5
 
 import (
-	"bepass/bufferpool"
-	"bepass/logger"
-	"bepass/socks5/statute"
 	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/bepass-org/bepass/bufferpool"
+	"github.com/bepass-org/bepass/logger"
+	"github.com/bepass-org/bepass/socks5/statute"
 	"github.com/elazarl/goproxy"
 	"golang.org/x/net/proxy"
 	"io"

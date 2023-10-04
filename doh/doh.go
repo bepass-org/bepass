@@ -2,11 +2,11 @@
 package doh
 
 import (
-	"bepass/config"
-	"bepass/dialer"
-	"bepass/resolve"
 	"encoding/base64"
 	"errors"
+	"github.com/bepass-org/bepass/config"
+	"github.com/bepass-org/bepass/dialer"
+	"github.com/bepass-org/bepass/resolve"
 	"io"
 	"net/http"
 	"time"

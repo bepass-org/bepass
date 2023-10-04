@@ -2,14 +2,14 @@
 package transport
 
 import (
-	"bepass/bufferpool"
-	"bepass/dialer"
-	"bepass/logger"
-	"bepass/net/adapter/ws"
-	"bepass/socks5"
-	"bepass/socks5/statute"
-	"bepass/utils"
 	"fmt"
+	"github.com/bepass-org/bepass/bufferpool"
+	"github.com/bepass-org/bepass/dialer"
+	"github.com/bepass-org/bepass/logger"
+	"github.com/bepass-org/bepass/net/adapter/ws"
+	"github.com/bepass-org/bepass/socks5"
+	"github.com/bepass-org/bepass/socks5/statute"
+	"github.com/bepass-org/bepass/utils"
 	"io"
 	"net"
 	"strings"

@@ -1,9 +1,9 @@
 package tun2socks
 
 import (
-	"bepass/config"
 	"encoding/json"
 	"errors"
+	"github.com/bepass-org/bepass/config"
 	"io"
 	"net"
 	"os"
@@ -19,7 +19,7 @@ import (
 	"github.com/eycorsican/go-tun2socks/core"
 	"github.com/eycorsican/go-tun2socks/proxy/socks"
 
-	bepassCore "bepass/server"
+	bepassCore "github.com/bepass-org/bepass/server"
 
 	"github.com/songgao/water"
 )

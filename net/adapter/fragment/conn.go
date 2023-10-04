@@ -1,9 +1,9 @@
 package fragment
 
 import (
-	"bepass/config"
-	"bepass/sni"
 	"bytes"
+	"github.com/bepass-org/bepass/config"
+	"github.com/bepass-org/bepass/sni"
 	"math/rand"
 	"net"
 	"sync"

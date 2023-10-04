@@ -2,12 +2,12 @@
 package transport
 
 import (
-	"bepass/config"
-	"bepass/dialer"
-	"bepass/logger"
-	"bepass/net/adapter/ws"
 	"context"
 	"encoding/binary"
+	"github.com/bepass-org/bepass/config"
+	"github.com/bepass-org/bepass/dialer"
+	"github.com/bepass-org/bepass/logger"
+	"github.com/bepass-org/bepass/net/adapter/ws"
 	"net"
 	"strings"
 	"time"

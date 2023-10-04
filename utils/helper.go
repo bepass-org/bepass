@@ -2,8 +2,8 @@
 package utils
 
 import (
-	"bepass/config"
 	"fmt"
+	"github.com/bepass-org/bepass/config"
 	"net"
 	"net/url"
 	"strings"

@@ -4,10 +4,10 @@
 package socks5
 
 import (
-	"bepass/logger"
-	"bepass/socks5/statute"
 	"context"
 	"fmt"
+	"github.com/bepass-org/bepass/logger"
+	"github.com/bepass-org/bepass/socks5/statute"
 	"io"
 	"net"
 	"strings"

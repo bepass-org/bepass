@@ -3,8 +3,8 @@
 package dialer
 
 import (
-	"bepass/logger"
-	"bepass/protect"
+	"github.com/bepass-org/bepass/logger"
+	"github.com/bepass-org/bepass/protect"
 	"net"
 	"runtime"
 	"strconv"

@@ -6,7 +6,7 @@ package socks5
 import (
 	"context"
 
-	"bepass/socks5/statute"
+	"github.com/bepass-org/bepass/socks5/statute"
 )
 
 // RuleSet is an interface used to provide custom rules for allowing or prohibiting actions.

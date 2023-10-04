@@ -1,7 +1,7 @@
 package config
 
 import (
-	"bepass/resolve"
+	"github.com/bepass-org/bepass/resolve"
 )
 
 type Config struct {
